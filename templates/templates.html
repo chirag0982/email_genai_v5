@@ -673,19 +673,22 @@ document.addEventListener('DOMContentLoaded', function() {
             saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
             saveBtn.disabled = true;
 
+            // Prepare data in the format expected by the save-template endpoint
+            const templateData = {
+                name: generatedTemplateData.template_name || 'Generated Template',
+                description: generatedTemplateData.description || 'AI-generated email template',
+                subject_template: generatedTemplateData.subject_template || '',
+                body_template: generatedTemplateData.body_template || '',
+                default_tone: 'professional',
+                is_public: false
+            };
+
             const response = await fetch('/api/save-template', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    name: generatedTemplateData.name,
-                    description: generatedTemplateData.description,
-                    subject_template: generatedTemplateData.subject_template,
-                    body_template: generatedTemplateData.body_template,
-                    default_tone: document.getElementById('templateTone').value,
-                    is_public: false
-                })
+                body: JSON.stringify(templateData)
             });
 
             const result = await response.json();

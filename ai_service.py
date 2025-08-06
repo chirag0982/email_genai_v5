@@ -1123,7 +1123,18 @@ Respond ONLY with valid JSON matching the exact structure above."""
                     logging.warning("AI returned empty response, using intelligent fallback")
                     return self._fallback_template_generation(purpose, template_type, tone, industry, start_time)
                 
-                template_result = json.loads(result)
+                # Clean the result - remove markdown code blocks if present
+                cleaned_result = result.strip()
+                if cleaned_result.startswith('```json'):
+                    cleaned_result = cleaned_result[7:]  # Remove ```json
+                if cleaned_result.startswith('```'):
+                    cleaned_result = cleaned_result[3:]   # Remove ```
+                if cleaned_result.endswith('```'):
+                    cleaned_result = cleaned_result[:-3]  # Remove ending ```
+                cleaned_result = cleaned_result.strip()
+                
+                logging.info(f"Cleaned AI response for JSON parsing: {cleaned_result[:200]}...")
+                template_result = json.loads(cleaned_result)
                 
                 # Validate and enhance the result
                 if 'template_name' in template_result and 'body_template' in template_result:
