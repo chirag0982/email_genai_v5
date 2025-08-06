@@ -2,6 +2,7 @@ modules = ["python-3.11"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["bash", "iana-etc", "libxcrypt"]
 
 [workflows]
 runButton = "Project"
@@ -19,6 +20,10 @@ args = "Hello World Script"
 task = "workflow.run"
 args = "main"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Hybrid App"
+
 [[workflows.workflow]]
 name = "Hello World Script"
 author = "agent"
@@ -34,3 +39,16 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python hello.py"
+
+[[workflows.workflow]]
+name = "Hybrid App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python hybrid_main.py"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
