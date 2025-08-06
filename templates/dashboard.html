@@ -370,8 +370,8 @@
 
 {% block scripts %}
 <script>
-// Handle team invitation responses
-async function respondToInvitation(invitationId, response) {
+// Handle team invitation responses - Define globally
+window.respondToInvitation = async function(invitationId, response) {
     try {
         const result = await fetch('/api/respond-invitation', {
             method: 'POST',
@@ -387,18 +387,37 @@ async function respondToInvitation(invitationId, response) {
         const data = await result.json();
 
         if (data.success) {
-            showToast(data.message || `Invitation ${response}ed successfully`, 'success');
+            if (typeof showToast === 'function') {
+                showToast(data.message || `Invitation ${response}ed successfully`, 'success');
+            } else {
+                alert(data.message || `Invitation ${response}ed successfully`);
+            }
             // Reload the page to update the invitations list
             setTimeout(() => {
                 window.location.reload();
             }, 1500);
         } else {
-            showToast('Error: ' + (data.error || 'Unknown error occurred'), 'error');
+            const errorMsg = 'Error: ' + (data.error || 'Unknown error occurred');
+            if (typeof showToast === 'function') {
+                showToast(errorMsg, 'error');
+            } else {
+                alert(errorMsg);
+            }
         }
     } catch (error) {
         console.error('Error responding to invitation:', error);
-        showToast('Network error while responding to invitation', 'error');
+        const errorMsg = 'Network error while responding to invitation';
+        if (typeof showToast === 'function') {
+            showToast(errorMsg, 'error');
+        } else {
+            alert(errorMsg);
+        }
     }
+}
+
+// Also define as regular function for backward compatibility
+async function respondToInvitation(invitationId, response) {
+    return window.respondToInvitation(invitationId, response);
 }
 
 // Add showToast function if it doesn't exist
@@ -616,8 +635,9 @@ async function deleteDraft(emailId) {
     }
 }
 
-// Add event listeners for view email buttons
+// Add event listeners for view email buttons and invitation responses
 document.addEventListener('DOMContentLoaded', function() {
+    // View email buttons
     document.querySelectorAll('.view-email-btn').forEach(button => {
         button.addEventListener('click', function(event) {
             event.preventDefault(); // Prevent default link behavior
@@ -625,6 +645,30 @@ document.addEventListener('DOMContentLoaded', function() {
             viewEmail(emailId);
         });
     });
+
+    // Make sure respondToInvitation is available globally
+    if (typeof window.respondToInvitation === 'undefined') {
+        console.error('respondToInvitation function not defined');
+    }
+
+    // Add click handlers for invitation buttons as backup
+    document.querySelectorAll('[onclick*="respondToInvitation"]').forEach(button => {
+        const onclick = button.getAttribute('onclick');
+        if (onclick) {
+            button.addEventListener('click', function(e) {
+                // Prevent the inline onclick if our function exists
+                if (typeof window.respondToInvitation === 'function') {
+                    e.preventDefault();
+                    // Extract parameters from onclick attribute
+                    const match = onclick.match(/respondToInvitation\('([^']+)',\s*'([^']+)'\)/);
+                    if (match) {
+                        window.respondToInvitation(match[1], match[2]);
+                    }
+                }
+            });
+        }
+    });
+
     feather.replace(); // Initialize feather icons
 });
 </script>
