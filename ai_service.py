@@ -39,6 +39,19 @@ class EmailGenerationResult(BaseModel):
     tone: str = Field(description="Email tone used")
     confidence: float = Field(description="Generation confidence 0-1")
 
+class TemplateGenerationResult(BaseModel):
+    template_name: str = Field(description="Generated template name")
+    description: str = Field(description="Template description and use case")
+    subject_template: str = Field(description="Email subject template with placeholders")
+    body_template: str = Field(description="Email body template with placeholders")
+    placeholders: List[str] = Field(description="List of available placeholders")
+    category: str = Field(description="Template category")
+    tone: str = Field(description="Template tone")
+    industry_specific: bool = Field(description="Whether template is industry-specific")
+    use_cases: List[str] = Field(description="Recommended use cases")
+    complexity_level: str = Field(description="Template complexity: simple, intermediate, advanced")
+    customization_tips: List[str] = Field(description="Tips for customizing the template")
+
 # AI Model configuration
 AI_MODELS = {
     'qwen-4-turbo': {
@@ -960,6 +973,461 @@ Respond only with valid JSON.
             tone=tone,
             custom_instructions=custom_instructions
         )
+
+    def generate_email_template(self, template_type: str = "professional", purpose: str = "", tone: str = "professional", industry: str = "", custom_instructions: str = "") -> Dict[str, Any]:
+        """
+        🚀 SPECTACULAR AI-POWERED EMAIL TEMPLATE GENERATOR 🚀
+        
+        Advanced LangChain-powered system that creates intelligent, adaptive email templates
+        with multiple AI models, smart categorization, and industry-specific customization.
+        
+        Features:
+        - Multi-model AI orchestration (Qwen-4, Claude-4, GPT-4o)
+        - Advanced prompt engineering with LangChain ChatPromptTemplate
+        - Intelligent placeholder generation
+        - Industry-specific customization
+        - Dynamic complexity assessment
+        - Smart categorization and use case detection
+        - Comprehensive metadata generation
+        """
+        try:
+            start_time = time.time()
+            
+            if not purpose.strip():
+                return {
+                    'success': False,
+                    'error': 'Template purpose is required to generate meaningful templates'
+                }
+
+            # Select optimal AI model based on template complexity and type
+            selected_model = None
+            model_name = "qwen-4-turbo"  # Default to most capable model
+            
+            # Smart model selection based on requirements
+            if template_type in ['creative', 'marketing', 'narrative'] or industry in ['marketing', 'advertising', 'media']:
+                # Use Claude for creative and marketing templates
+                if 'claude-4-sonnet' in self.langchain_models:
+                    selected_model = self.langchain_models['claude-4-sonnet']
+                    model_name = "claude-4-sonnet"
+            elif template_type in ['technical', 'professional', 'complex'] or industry in ['technology', 'engineering', 'finance']:
+                # Use Qwen for technical and professional templates
+                if 'qwen-4-turbo' in self.langchain_models:
+                    selected_model = self.langchain_models['qwen-4-turbo']
+                    model_name = "qwen-4-turbo"
+            elif template_type in ['simple', 'quick', 'basic']:
+                # Use GPT-4o for simple templates
+                if 'gpt-4o' in self.langchain_models:
+                    selected_model = self.langchain_models['gpt-4o']
+                    model_name = "gpt-4o"
+            
+            # Fallback to any available model
+            if not selected_model:
+                for model_key, model_instance in self.langchain_models.items():
+                    selected_model = model_instance
+                    model_name = model_key
+                    break
+
+            if not selected_model:
+                return self._fallback_template_generation(purpose, template_type, tone, industry, start_time)
+
+            # Create sophisticated LangChain prompt for template generation
+            template_prompt_template = """You are an elite email template architect with expertise in business communication, psychology, and industry-specific messaging. You create intelligent, adaptive templates that professionals can customize for various scenarios.
+
+Create a comprehensive email template based on the requirements below. Generate a complete JSON response with these exact keys:
+
+REQUIRED JSON STRUCTURE:
+{{
+  "template_name": "Professional and descriptive name",
+  "description": "Clear description of template purpose and best use cases",
+  "subject_template": "Dynamic subject line with placeholders like {{{{recipient_name}}}}, {{{{company}}}}, {{{{topic}}}}",
+  "body_template": "Complete email body with smart placeholders and professional structure",
+  "placeholders": ["{{{{placeholder1}}}}", "{{{{placeholder2}}}}", ...],
+  "category": "One of: business, sales, support, follow-up, meeting, project, personal, marketing, technical",
+  "tone": "Actual tone of the template: professional, friendly, formal, casual, urgent, persuasive",
+  "industry_specific": true/false,
+  "use_cases": ["Specific scenario 1", "Specific scenario 2", ...],
+  "complexity_level": "simple, intermediate, or advanced",
+  "customization_tips": ["Tip 1", "Tip 2", "Tip 3", ...]
+}}
+
+TEMPLATE REQUIREMENTS:
+- Purpose: {purpose}
+- Template Type: {template_type}
+- Desired Tone: {tone}
+- Industry Context: {industry}
+- Custom Instructions: {custom_instructions}
+
+ADVANCED TEMPLATE FEATURES TO INCLUDE:
+1. **Smart Placeholders**: Use meaningful placeholders like {{{{recipient_name}}}}, {{{{company}}}}, {{{{project_name}}}}, {{{{deadline}}}}, {{{{next_steps}}}}
+2. **Dynamic Structure**: Adapt structure based on purpose (greeting, context, main message, action items, closing)
+3. **Industry Optimization**: Include industry-specific language and considerations
+4. **Tone Consistency**: Ensure tone matches throughout subject and body
+5. **Action-Oriented**: Include clear call-to-action or next steps
+6. **Professional Polish**: Proper formatting, spacing, and professional language
+
+INTELLIGENT CUSTOMIZATION:
+- For SALES templates: Include value propositions, benefit statements, and clear CTAs
+- For SUPPORT templates: Include empathy, solution focus, and follow-up steps
+- For FOLLOW-UP templates: Reference previous interactions and clear next steps
+- For MEETING templates: Include agenda items, time considerations, and preparation notes
+- For PROJECT templates: Include status updates, deliverables, and timeline references
+
+PLACEHOLDER STRATEGY:
+- Use specific, meaningful placeholders that guide users
+- Include both required ({{{{recipient_name}}}}) and optional ({{{{company}}}}) placeholders
+- Provide context for when to use each placeholder
+- Ensure placeholders enhance personalization
+
+CUSTOMIZATION TIPS SHOULD INCLUDE:
+- How to adapt tone for different relationships
+- When to add or remove sections
+- Industry-specific modifications
+- Personalization strategies
+- Common variations and use cases
+
+Generate a template that is professional, practical, and immediately usable while being highly customizable.
+
+Respond ONLY with valid JSON matching the exact structure above."""
+
+            # Create LangChain prompt
+            template_prompt = ChatPromptTemplate.from_messages([
+                ("system", template_prompt_template),
+                ("human", "Generate template for: {purpose}")
+            ])
+
+            # Create output parser for structured response
+            template_parser = PydanticOutputParser(pydantic_object=TemplateGenerationResult)
+
+            # Create LangChain chain
+            template_chain = template_prompt | selected_model | StrOutputParser()
+
+            # Execute template generation
+            result = template_chain.invoke({
+                "purpose": purpose,
+                "template_type": template_type,
+                "tone": tone,
+                "industry": industry if industry else "general business",
+                "custom_instructions": custom_instructions if custom_instructions else "Follow standard best practices"
+            })
+
+            # Parse JSON response
+            try:
+                template_result = json.loads(result)
+                
+                # Validate and enhance the result
+                if 'template_name' in template_result and 'body_template' in template_result:
+                    # Add processing metadata
+                    generation_time_ms = int((time.time() - start_time) * 1000)
+                    
+                    # Enhance result with additional intelligence
+                    enhanced_result = {
+                        'success': True,
+                        'template_name': template_result.get('template_name', f"{purpose.title()} Template"),
+                        'description': template_result.get('description', f"Professional template for {purpose}"),
+                        'subject_template': template_result.get('subject_template', f"Re: {{{{topic}}}} - {{{{your_name}}}}"),
+                        'body_template': template_result.get('body_template', "Template body not generated properly"),
+                        'placeholders': template_result.get('placeholders', ["{{recipient_name}}", "{{your_name}}", "{{topic}}"]),
+                        'category': template_result.get('category', self._determine_category(purpose, template_type)),
+                        'tone': template_result.get('tone', tone),
+                        'industry_specific': template_result.get('industry_specific', bool(industry)),
+                        'use_cases': template_result.get('use_cases', [purpose]),
+                        'complexity_level': template_result.get('complexity_level', self._assess_complexity(template_result.get('body_template', ''))),
+                        'customization_tips': template_result.get('customization_tips', self._generate_customization_tips(purpose, tone)),
+                        'model_used': model_name,
+                        'generation_time_ms': generation_time_ms,
+                        'ai_enhanced': True,
+                        'langchain_features': ['ChatPromptTemplate', 'StrOutputParser', 'RunnableSequence'],
+                        'metadata': {
+                            'created_by': 'ai',
+                            'template_version': '2.0',
+                            'supports_placeholders': True,
+                            'multi_industry': not bool(industry),
+                            'generation_method': f'langchain_{model_name}'
+                        }
+                    }
+                    
+                    return enhanced_result
+                else:
+                    logging.warning("Incomplete template generated by AI, using fallback enhancement")
+                    
+            except json.JSONDecodeError as e:
+                logging.warning(f"Failed to parse AI template response: {e}, using intelligent fallback")
+
+            # Enhanced fallback with AI-inspired generation
+            return self._fallback_template_generation(purpose, template_type, tone, industry, start_time)
+
+        except Exception as e:
+            logging.error(f"Error in AI template generation: {str(e)}")
+            return self._fallback_template_generation(purpose, template_type, tone, industry, time.time())
+
+    def _determine_category(self, purpose: str, template_type: str) -> str:
+        """Intelligently determine template category"""
+        purpose_lower = purpose.lower()
+        type_lower = template_type.lower()
+        
+        category_mapping = {
+            'sales': ['sell', 'proposal', 'quote', 'offer', 'pitch', 'demo'],
+            'support': ['help', 'support', 'issue', 'problem', 'question', 'assistance'],
+            'follow-up': ['follow', 'check', 'update', 'progress', 'status'],
+            'meeting': ['meet', 'call', 'schedule', 'appointment', 'discussion'],
+            'project': ['project', 'task', 'deliverable', 'milestone', 'deadline'],
+            'marketing': ['market', 'campaign', 'promotion', 'announcement', 'launch'],
+            'technical': ['technical', 'development', 'code', 'system', 'integration']
+        }
+        
+        for category, keywords in category_mapping.items():
+            if any(keyword in purpose_lower or keyword in type_lower for keyword in keywords):
+                return category
+                
+        return 'business'
+
+    def _assess_complexity(self, template_body: str) -> str:
+        """Assess template complexity based on structure and content"""
+        if not template_body:
+            return 'simple'
+            
+        # Count various complexity indicators
+        placeholders = template_body.count('{{')
+        sentences = len([s for s in template_body.split('.') if s.strip()])
+        paragraphs = len([p for p in template_body.split('\n\n') if p.strip()])
+        
+        complexity_score = 0
+        if placeholders > 8: complexity_score += 2
+        elif placeholders > 4: complexity_score += 1
+        
+        if sentences > 15: complexity_score += 2
+        elif sentences > 8: complexity_score += 1
+        
+        if paragraphs > 4: complexity_score += 2
+        elif paragraphs > 2: complexity_score += 1
+        
+        if complexity_score >= 4:
+            return 'advanced'
+        elif complexity_score >= 2:
+            return 'intermediate'
+        else:
+            return 'simple'
+
+    def _generate_customization_tips(self, purpose: str, tone: str) -> List[str]:
+        """Generate intelligent customization tips"""
+        base_tips = [
+            f"Adjust the {{{{recipient_name}}}} placeholder to match your relationship level",
+            f"Modify the tone to be more {tone} or formal based on your audience",
+            "Add specific details relevant to your industry or situation",
+            "Include relevant attachments or links in the body when needed"
+        ]
+        
+        purpose_lower = purpose.lower()
+        
+        # Purpose-specific tips
+        if 'meeting' in purpose_lower:
+            base_tips.extend([
+                "Include specific agenda items relevant to your meeting",
+                "Add calendar links or scheduling tools for convenience",
+                "Specify time zone and duration expectations"
+            ])
+        elif 'follow' in purpose_lower:
+            base_tips.extend([
+                "Reference specific previous conversations or commitments",
+                "Include concrete next steps and timelines",
+                "Mention any changed circumstances since last contact"
+            ])
+        elif 'proposal' in purpose_lower or 'sales' in purpose_lower:
+            base_tips.extend([
+                "Customize value propositions to the recipient's specific needs",
+                "Include relevant case studies or testimonials",
+                "Add clear pricing and timeline information"
+            ])
+        
+        return base_tips[:6]  # Limit to 6 tips for usability
+
+    def _fallback_template_generation(self, purpose: str, template_type: str, tone: str, industry: str, start_time: float) -> Dict[str, Any]:
+        """Enhanced fallback template generation with intelligent defaults"""
+        try:
+            # Generate intelligent template name
+            template_name = f"{purpose.title().replace('_', ' ')} Template"
+            if industry:
+                template_name = f"{industry.title()} {template_name}"
+
+            # Create smart subject template
+            if 'meeting' in purpose.lower():
+                subject_template = "Meeting Request: {{topic}} - {{your_name}}"
+            elif 'follow' in purpose.lower():
+                subject_template = "Follow-up: {{topic}} - Next Steps"
+            elif 'proposal' in purpose.lower():
+                subject_template = "Proposal: {{service}} for {{company}}"
+            else:
+                subject_template = "Re: {{topic}} - {{your_name}}"
+
+            # Generate intelligent body template based on purpose
+            body_templates = {
+                'meeting': """Dear {{recipient_name}},
+
+I hope this email finds you well. I would like to schedule a meeting to discuss {{topic}}.
+
+Meeting Details:
+- Purpose: {{meeting_purpose}}
+- Suggested Duration: {{duration}}
+- Proposed Date/Time: {{datetime}}
+- Location/Platform: {{location}}
+
+Agenda items I'd like to cover:
+- {{agenda_item1}}
+- {{agenda_item2}}
+- {{agenda_item3}}
+
+Please let me know if this time works for you, or suggest alternative times that might be more convenient.
+
+Best regards,
+{{your_name}}
+{{your_title}}
+{{your_contact}}""",
+
+                'follow_up': """Dear {{recipient_name}},
+
+I wanted to follow up on our previous conversation about {{topic}}.
+
+As discussed, I'm reaching out to {{purpose}} and ensure we're aligned on next steps.
+
+Current Status:
+- {{status_item1}}
+- {{status_item2}}
+
+Next Steps:
+- {{next_step1}} (Target: {{date1}})
+- {{next_step2}} (Target: {{date2}})
+
+Please let me know if you have any questions or if there's anything I can help clarify.
+
+Best regards,
+{{your_name}}""",
+
+                'proposal': """Dear {{recipient_name}},
+
+Thank you for your interest in {{service}}. I'm pleased to present this proposal for {{project_name}}.
+
+Project Overview:
+{{project_description}}
+
+Scope of Work:
+- {{deliverable1}}
+- {{deliverable2}}
+- {{deliverable3}}
+
+Timeline: {{timeline}}
+Investment: {{cost}}
+
+I believe this solution will {{benefit}} and I'm excited about the opportunity to work with {{company}}.
+
+I'd be happy to discuss this proposal in detail. Please let me know when you're available for a call.
+
+Best regards,
+{{your_name}}
+{{your_title}}
+{{your_contact}}""",
+
+                'support': """Dear {{recipient_name}},
+
+Thank you for reaching out regarding {{issue}}.
+
+I understand that {{problem_description}} and I'm here to help resolve this promptly.
+
+To assist you effectively, I've {{initial_action}} and would like to {{next_action}}.
+
+Resolution Steps:
+1. {{step1}}
+2. {{step2}}
+3. {{step3}}
+
+Timeline: {{resolution_timeline}}
+
+If you have any questions or need immediate assistance, please don't hesitate to contact me at {{contact_method}}.
+
+Best regards,
+{{your_name}}
+{{your_title}}"""
+            }
+
+            # Select appropriate template or create generic one
+            purpose_key = next((key for key in body_templates.keys() if key in purpose.lower()), None)
+            
+            if purpose_key:
+                body_template = body_templates[purpose_key]
+                placeholders = [
+                    '{{recipient_name}}', '{{your_name}}', '{{topic}}', '{{your_title}}', '{{your_contact}}'
+                ]
+                
+                # Add purpose-specific placeholders
+                if purpose_key == 'meeting':
+                    placeholders.extend(['{{meeting_purpose}}', '{{duration}}', '{{datetime}}', '{{location}}', 
+                                       '{{agenda_item1}}', '{{agenda_item2}}', '{{agenda_item3}}'])
+                elif purpose_key == 'follow_up':
+                    placeholders.extend(['{{purpose}}', '{{status_item1}}', '{{status_item2}}', 
+                                       '{{next_step1}}', '{{date1}}', '{{next_step2}}', '{{date2}}'])
+                elif purpose_key == 'proposal':
+                    placeholders.extend(['{{service}}', '{{project_name}}', '{{project_description}}', 
+                                       '{{deliverable1}}', '{{deliverable2}}', '{{deliverable3}}', 
+                                       '{{timeline}}', '{{cost}}', '{{benefit}}', '{{company}}'])
+                elif purpose_key == 'support':
+                    placeholders.extend(['{{issue}}', '{{problem_description}}', '{{initial_action}}', 
+                                       '{{next_action}}', '{{step1}}', '{{step2}}', '{{step3}}', 
+                                       '{{resolution_timeline}}', '{{contact_method}}'])
+            else:
+                # Generic template
+                body_template = f"""Dear {{{{recipient_name}}}},
+
+I hope this email finds you well. I'm writing to {{{{purpose}}}}.
+
+{{{{main_content}}}}
+
+{{{{call_to_action}}}}
+
+Please let me know if you have any questions or need any additional information.
+
+Best regards,
+{{{{your_name}}}}
+{{{{your_title}}}}"""
+                
+                placeholders = ['{{recipient_name}}', '{{purpose}}', '{{main_content}}', 
+                              '{{call_to_action}}', '{{your_name}}', '{{your_title}}']
+
+            generation_time_ms = int((time.time() - start_time) * 1000)
+
+            return {
+                'success': True,
+                'template_name': template_name,
+                'description': f"Professional {purpose} template suitable for {tone} communication" + 
+                             (f" in {industry} industry" if industry else ""),
+                'subject_template': subject_template,
+                'body_template': body_template,
+                'placeholders': placeholders,
+                'category': self._determine_category(purpose, template_type),
+                'tone': tone,
+                'industry_specific': bool(industry),
+                'use_cases': [purpose, f"{tone} communication", "professional correspondence"],
+                'complexity_level': self._assess_complexity(body_template),
+                'customization_tips': self._generate_customization_tips(purpose, tone),
+                'model_used': 'intelligent_fallback',
+                'generation_time_ms': generation_time_ms,
+                'ai_enhanced': False,
+                'langchain_features': ['intelligent_fallback'],
+                'metadata': {
+                    'created_by': 'fallback_system',
+                    'template_version': '1.0',
+                    'supports_placeholders': True,
+                    'multi_industry': not bool(industry),
+                    'generation_method': 'rule_based_intelligent'
+                }
+            }
+
+        except Exception as e:
+            logging.error(f"Error in fallback template generation: {str(e)}")
+            return {
+                'success': False,
+                'error': f'Failed to generate template: {str(e)}',
+                'model_used': 'error_fallback',
+                'generation_time_ms': int((time.time() - start_time) * 1000)
+            }
 
     def analyze_email_sentiment(self, email_content: str) -> Dict[str, Any]:
         """Analyze email sentiment using LangChain (backwards compatibility)"""
