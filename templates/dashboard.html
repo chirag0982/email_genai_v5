@@ -370,6 +370,81 @@
 
 {% block scripts %}
 <script>
+// Handle team invitation responses
+async function respondToInvitation(invitationId, response) {
+    try {
+        const result = await fetch('/api/respond-invitation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                invitation_id: invitationId,
+                response: response
+            })
+        });
+
+        const data = await result.json();
+
+        if (data.success) {
+            showToast(data.message || `Invitation ${response}ed successfully`, 'success');
+            // Reload the page to update the invitations list
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast('Error: ' + (data.error || 'Unknown error occurred'), 'error');
+        }
+    } catch (error) {
+        console.error('Error responding to invitation:', error);
+        showToast('Network error while responding to invitation', 'error');
+    }
+}
+
+// Add showToast function if it doesn't exist
+function showToast(message, type = 'info') {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
+    }
+
+    // Create toast element
+    const toastId = 'toast-' + Date.now();
+    const toastHtml = `
+        <div class="toast" id="${toastId}" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="text-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'primary'} me-2" data-feather="${type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : 'info'}"></i>
+                <strong class="me-auto">${type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Info'}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        </div>
+    `;
+
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+    // Initialize and show the toast
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement);
+    toast.show();
+
+    // Refresh feather icons for the new toast
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+
+    // Remove toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
+}
+</script>
+<script>
 async function respondToInvitation(invitationId, response) {
     try {
         const res = await fetch('/api/respond-invitation', {
