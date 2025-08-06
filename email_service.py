@@ -28,6 +28,32 @@ class EmailService:
         Send an email using the user's SMTP configuration
         """
         try:
+            # Ensure all address parameters are lists (defensive programming)
+            def ensure_list(addr_param):
+                if addr_param is None:
+                    return []
+                if isinstance(addr_param, list):
+                    return addr_param
+                if isinstance(addr_param, str):
+                    # Try to parse as JSON first
+                    try:
+                        import json
+                        parsed = json.loads(addr_param)
+                        # Handle double-encoded JSON strings recursively
+                        if isinstance(parsed, str):
+                            try:
+                                parsed = json.loads(parsed)
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+                        return parsed if isinstance(parsed, list) else []
+                    except (json.JSONDecodeError, TypeError):
+                        # If not JSON, treat as single email
+                        return [addr_param] if addr_param.strip() else []
+                return []
+
+            to_addresses = ensure_list(to_addresses)
+            cc_addresses = ensure_list(cc_addresses)
+            bcc_addresses = ensure_list(bcc_addresses)
             # Validate user has SMTP configuration
             if not all([user.smtp_server, user.smtp_port, user.smtp_username, user.smtp_password]):
                 return {

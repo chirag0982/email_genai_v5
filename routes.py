@@ -102,7 +102,14 @@ def compose():
                     # If it's a string (old JSON string format), parse it
                     if isinstance(addr_field, str):
                         try:
-                            return json.loads(addr_field)
+                            parsed = json.loads(addr_field)
+                            # Handle double-encoded JSON strings recursively
+                            if isinstance(parsed, str):
+                                try:
+                                    parsed = json.loads(parsed)
+                                except (json.JSONDecodeError, TypeError):
+                                    pass
+                            return parsed if isinstance(parsed, list) else []
                         except (json.JSONDecodeError, TypeError):
                             return []
                     return []
@@ -274,7 +281,14 @@ def send_email():
             # If it's a string (old JSON string format), parse it
             if isinstance(addr_field, str):
                 try:
-                    return json.loads(addr_field)
+                    parsed = json.loads(addr_field)
+                    # Handle double-encoded JSON strings recursively
+                    if isinstance(parsed, str):
+                        try:
+                            parsed = json.loads(parsed)
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    return parsed if isinstance(parsed, list) else []
                 except (json.JSONDecodeError, TypeError):
                     return []
             return []
@@ -282,6 +296,11 @@ def send_email():
         to_addresses = parse_addresses(email.to_addresses)
         cc_addresses = parse_addresses(email.cc_addresses)
         bcc_addresses = parse_addresses(email.bcc_addresses)
+        
+        # Debug logging
+        logging.info(f"Parsed addresses - To: {to_addresses} (type: {type(to_addresses)})")
+        logging.info(f"Parsed addresses - CC: {cc_addresses} (type: {type(cc_addresses)})")
+        logging.info(f"Parsed addresses - BCC: {bcc_addresses} (type: {type(bcc_addresses)})")
 
         # Validate required fields
         if not to_addresses or not email.subject:
