@@ -348,11 +348,15 @@
                             </div>
                             <div class="btn-group-vertical" role="group">
                                 <button type="button" class="btn btn-sm btn-success" 
-                                        onclick="respondToInvitation('{{ invitation.id }}', 'accept')">
+                                        onclick="respondToInvitation('{{ invitation.id }}', 'accept')"
+                                        data-invitation-id="{{ invitation.id }}"
+                                        data-action="accept">
                                     <i data-feather="check"></i> Accept
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-danger" 
-                                        onclick="respondToInvitation('{{ invitation.id }}', 'decline')">
+                                        onclick="respondToInvitation('{{ invitation.id }}', 'decline')"
+                                        data-invitation-id="{{ invitation.id }}"
+                                        data-action="decline">
                                     <i data-feather="x"></i> Decline
                                 </button>
                             </div>
@@ -370,59 +374,8 @@
 
 {% block scripts %}
 <script>
-// Handle team invitation responses - Define globally
-async function respondToInvitation(invitationId, response) {
-    try {
-        console.log('Responding to invitation:', invitationId, response);
-        
-        const result = await fetch('/api/respond-invitation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                invitation_id: invitationId,
-                response: response
-            })
-        });
-
-        const data = await result.json();
-
-        if (data.success) {
-            if (typeof showToast === 'function') {
-                showToast(data.message || `Invitation ${response}ed successfully`, 'success');
-            } else {
-                alert(data.message || `Invitation ${response}ed successfully`);
-            }
-            // Reload the page to update the invitations list
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            const errorMsg = 'Error: ' + (data.error || 'Unknown error occurred');
-            if (typeof showToast === 'function') {
-                showToast(errorMsg, 'error');
-            } else {
-                alert(errorMsg);
-            }
-        }
-    } catch (error) {
-        console.error('Error responding to invitation:', error);
-        const errorMsg = 'Network error while responding to invitation';
-        if (typeof showToast === 'function') {
-            showToast(errorMsg, 'error');
-        } else {
-            alert(errorMsg);
-        }
-    }
-}
-
-// Make it globally accessible
-window.respondToInvitation = respondToInvitation;
-
-// Add showToast function if it doesn't exist
+// Toast notification function
 function showToast(message, type = 'info') {
-    // Create toast container if it doesn't exist
     let toastContainer = document.querySelector('.toast-container');
     if (!toastContainer) {
         toastContainer = document.createElement('div');
@@ -430,7 +383,6 @@ function showToast(message, type = 'info') {
         document.body.appendChild(toastContainer);
     }
 
-    // Create toast element
     const toastId = 'toast-' + Date.now();
     const toastHtml = `
         <div class="toast" id="${toastId}" role="alert" aria-live="assertive" aria-atomic="true">
@@ -439,29 +391,79 @@ function showToast(message, type = 'info') {
                 <strong class="me-auto">${type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Info'}</strong>
                 <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
             </div>
-            <div class="toast-body">
-                ${message}
-            </div>
+            <div class="toast-body">${message}</div>
         </div>
     `;
 
     toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-
-    // Initialize and show the toast
     const toastElement = document.getElementById(toastId);
     const toast = new bootstrap.Toast(toastElement);
     toast.show();
 
-    // Refresh feather icons for the new toast
     if (typeof feather !== 'undefined') {
         feather.replace();
     }
 
-    // Remove toast element after it's hidden
     toastElement.addEventListener('hidden.bs.toast', () => {
         toastElement.remove();
     });
 }
+
+// Team invitation response handler - rebuilt from scratch
+async function respondToInvitation(invitationId, response) {
+    if (!invitationId || !response) {
+        showToast('Invalid invitation data', 'error');
+        return;
+    }
+
+    if (!['accept', 'decline'].includes(response)) {
+        showToast('Invalid response type', 'error');
+        return;
+    }
+
+    try {
+        console.log('Processing invitation response:', { invitationId, response });
+
+        const requestData = {
+            invitation_id: invitationId,
+            response: response
+        };
+
+        const fetchResponse = await fetch('/api/respond-invitation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+
+        if (!fetchResponse.ok) {
+            throw new Error(`HTTP ${fetchResponse.status}: ${fetchResponse.statusText}`);
+        }
+
+        const result = await fetchResponse.json();
+
+        if (result.success) {
+            const actionText = response === 'accept' ? 'accepted' : 'declined';
+            showToast(result.message || `Invitation ${actionText} successfully!`, 'success');
+            
+            // Wait a moment then reload to update the page
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast(result.error || 'Failed to process invitation', 'error');
+        }
+
+    } catch (error) {
+        console.error('Error processing invitation:', error);
+        showToast('Network error: ' + error.message, 'error');
+    }
+}
+
+// Make function globally available
+window.respondToInvitation = respondToInvitation;
 </script>
 
 <script>
@@ -635,21 +637,35 @@ async function deleteDraft(emailId) {
     }
 }
 
-// Add event listeners for view email buttons and invitation responses
+// Initialize page functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize feather icons
+    feather.replace();
+    
+    // Test that respondToInvitation function is available
+    console.log('respondToInvitation function available:', typeof window.respondToInvitation === 'function');
+    
+    // Add backup event listeners for invitation buttons in case onclick fails
+    document.querySelectorAll('[data-invitation-id]').forEach(button => {
+        button.addEventListener('click', function(e) {
+            const invitationId = this.getAttribute('data-invitation-id');
+            const action = this.getAttribute('data-action');
+            
+            if (invitationId && action) {
+                e.preventDefault();
+                window.respondToInvitation(invitationId, action);
+            }
+        });
+    });
+    
     // View email buttons
     document.querySelectorAll('.view-email-btn').forEach(button => {
         button.addEventListener('click', function(event) {
-            event.preventDefault(); // Prevent default link behavior
+            event.preventDefault();
             const emailId = this.getAttribute('data-email-id');
             viewEmail(emailId);
         });
     });
-
-    // Make sure respondToInvitation is available globally
-    console.log('respondToInvitation function available:', typeof respondToInvitation !== 'undefined');
-
-    feather.replace(); // Initialize feather icons
 });
 </script>
 {% endblock %}
