@@ -488,6 +488,165 @@ def create_team():
         logging.error(f"Error creating team: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/invite-member', methods=['POST'])
+@require_login
+def invite_member():
+    """Invite a new team member"""
+    try:
+        data = request.get_json()
+        
+        team_id = data.get('team_id')
+        email = data.get('email', '').strip()
+        role = data.get('role', 'user')
+        
+        if not all([team_id, email]):
+            return jsonify({'success': False, 'error': 'Team ID and email are required'}), 400
+        
+        # Check if user has permission to invite (must be admin or manager)
+        user_membership = TeamMember.query.filter_by(
+            user_id=current_user.id,
+            team_id=team_id
+        ).first()
+        
+        if not user_membership or user_membership.role not in [UserRole.ADMIN, UserRole.MANAGER]:
+            return jsonify({'success': False, 'error': 'You do not have permission to invite members'}), 403
+        
+        # Check if team exists
+        team = Team.query.get(team_id)
+        if not team:
+            return jsonify({'success': False, 'error': 'Team not found'}), 404
+        
+        # Check if user exists
+        invited_user = User.query.filter_by(email=email).first()
+        if not invited_user:
+            return jsonify({'success': False, 'error': 'User with this email not found. They need to register first.'}), 404
+        
+        # Check if user is already a member
+        existing_membership = TeamMember.query.filter_by(
+            user_id=invited_user.id,
+            team_id=team_id
+        ).first()
+        
+        if existing_membership:
+            return jsonify({'success': False, 'error': 'User is already a member of this team'}), 400
+        
+        # Create membership
+        membership = TeamMember(
+            id=str(uuid.uuid4()),
+            user_id=invited_user.id,
+            team_id=team_id,
+            role=UserRole(role)
+        )
+        db.session.add(membership)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{invited_user.first_name or email} has been added to the team'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error inviting member: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/change-member-role', methods=['POST'])
+@require_login
+def change_member_role():
+    """Change a team member's role"""
+    try:
+        data = request.get_json()
+        
+        member_id = data.get('member_id')
+        new_role = data.get('role')
+        
+        if not all([member_id, new_role]):
+            return jsonify({'success': False, 'error': 'Member ID and role are required'}), 400
+        
+        # Get the membership to change
+        membership = TeamMember.query.get(member_id)
+        if not membership:
+            return jsonify({'success': False, 'error': 'Team member not found'}), 404
+        
+        # Check if current user has permission (must be admin)
+        user_membership = TeamMember.query.filter_by(
+            user_id=current_user.id,
+            team_id=membership.team_id
+        ).first()
+        
+        if not user_membership or user_membership.role != UserRole.ADMIN:
+            return jsonify({'success': False, 'error': 'Only team admins can change member roles'}), 403
+        
+        # Don't allow changing own role if you're the only admin
+        if membership.user_id == current_user.id:
+            admin_count = TeamMember.query.filter_by(
+                team_id=membership.team_id,
+                role=UserRole.ADMIN
+            ).count()
+            
+            if admin_count == 1 and new_role != 'admin':
+                return jsonify({'success': False, 'error': 'Cannot change role - you are the only admin'}), 400
+        
+        # Update role
+        membership.role = UserRole(new_role)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Member role updated successfully'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error changing member role: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/remove-member', methods=['DELETE'])
+@require_login
+def remove_member():
+    """Remove a team member"""
+    try:
+        data = request.get_json()
+        member_id = data.get('member_id')
+        
+        if not member_id:
+            return jsonify({'success': False, 'error': 'Member ID is required'}), 400
+        
+        # Get the membership to remove
+        membership = TeamMember.query.get(member_id)
+        if not membership:
+            return jsonify({'success': False, 'error': 'Team member not found'}), 404
+        
+        # Check if current user has permission (must be admin)
+        user_membership = TeamMember.query.filter_by(
+            user_id=current_user.id,
+            team_id=membership.team_id
+        ).first()
+        
+        if not user_membership or user_membership.role != UserRole.ADMIN:
+            return jsonify({'success': False, 'error': 'Only team admins can remove members'}), 403
+        
+        # Don't allow removing yourself if you're the only admin
+        if membership.user_id == current_user.id:
+            admin_count = TeamMember.query.filter_by(
+                team_id=membership.team_id,
+                role=UserRole.ADMIN
+            ).count()
+            
+            if admin_count == 1:
+                return jsonify({'success': False, 'error': 'Cannot remove yourself - you are the only admin'}), 400
+        
+        # Remove membership
+        db.session.delete(membership)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Member removed successfully'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error removing member: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 @app.route('/analytics')
