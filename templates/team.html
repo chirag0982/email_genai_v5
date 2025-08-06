@@ -510,7 +510,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({ member_id: currentActionData })
                 });
-            } else if (currentAction === 'cancel-invitation') {
+            } else if (currentAction === 'cancelInvitation') {
                 response = await fetch('/api/cancel-invitation', {
                     method: 'DELETE',
                     headers: {
@@ -590,7 +590,7 @@ function cancelInvitation(invitationId, userName) {
     document.getElementById('confirmModalMessage').textContent = 
         `Are you sure you want to cancel the invitation sent to ${userName}?`;
 
-    currentAction = 'cancel-invitation';
+    currentAction = 'cancelInvitation';
     currentActionData = invitationId;
 
     new bootstrap.Modal(document.getElementById('confirmModal')).show();
