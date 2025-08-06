@@ -371,8 +371,10 @@
 {% block scripts %}
 <script>
 // Handle team invitation responses - Define globally
-window.respondToInvitation = async function(invitationId, response) {
+async function respondToInvitation(invitationId, response) {
     try {
+        console.log('Responding to invitation:', invitationId, response);
+        
         const result = await fetch('/api/respond-invitation', {
             method: 'POST',
             headers: {
@@ -415,10 +417,8 @@ window.respondToInvitation = async function(invitationId, response) {
     }
 }
 
-// Also define as regular function for backward compatibility
-async function respondToInvitation(invitationId, response) {
-    return window.respondToInvitation(invitationId, response);
-}
+// Make it globally accessible
+window.respondToInvitation = respondToInvitation;
 
 // Add showToast function if it doesn't exist
 function showToast(message, type = 'info') {
@@ -647,27 +647,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Make sure respondToInvitation is available globally
-    if (typeof window.respondToInvitation === 'undefined') {
-        console.error('respondToInvitation function not defined');
-    }
-
-    // Add click handlers for invitation buttons as backup
-    document.querySelectorAll('[onclick*="respondToInvitation"]').forEach(button => {
-        const onclick = button.getAttribute('onclick');
-        if (onclick) {
-            button.addEventListener('click', function(e) {
-                // Prevent the inline onclick if our function exists
-                if (typeof window.respondToInvitation === 'function') {
-                    e.preventDefault();
-                    // Extract parameters from onclick attribute
-                    const match = onclick.match(/respondToInvitation\('([^']+)',\s*'([^']+)'\)/);
-                    if (match) {
-                        window.respondToInvitation(match[1], match[2]);
-                    }
-                }
-            });
-        }
-    });
+    console.log('respondToInvitation function available:', typeof respondToInvitation !== 'undefined');
 
     feather.replace(); // Initialize feather icons
 });
