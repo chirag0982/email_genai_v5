@@ -444,36 +444,6 @@ function showToast(message, type = 'info') {
     });
 }
 </script>
-<script>
-async function respondToInvitation(invitationId, response) {
-    try {
-        const res = await fetch('/api/respond-invitation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                invitation_id: invitationId,
-                response: response
-            })
-        });
-
-        const result = await res.json();
-
-        if (result.success) {
-            showToast(result.message, 'success');
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            showToast('Error: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        showToast('Network error', 'error');
-    }
-}
-</script>
 
 <script>
 // Function to view email details
