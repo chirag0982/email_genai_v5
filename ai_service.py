@@ -1109,9 +1109,20 @@ Respond ONLY with valid JSON matching the exact structure above."""
                 "industry": industry if industry else "general business",
                 "custom_instructions": custom_instructions if custom_instructions else "Follow standard best practices"
             })
+            
+            logging.info(f"AI model {model_name} returned result type: {type(result)}, length: {len(result) if result else 0}")
+            if result:
+                logging.info(f"AI response preview: {result[:200]}...")
+            else:
+                logging.warning("AI returned None or empty response")
 
             # Parse JSON response
             try:
+                # Check if result is empty or whitespace
+                if not result or not result.strip():
+                    logging.warning("AI returned empty response, using intelligent fallback")
+                    return self._fallback_template_generation(purpose, template_type, tone, industry, start_time)
+                
                 template_result = json.loads(result)
                 
                 # Validate and enhance the result

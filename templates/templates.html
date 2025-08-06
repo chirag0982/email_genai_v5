@@ -613,11 +613,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
 
             if (result.success) {
-                generatedTemplateData = result.template;
+                generatedTemplateData = result;
                 displayGeneratedTemplate(result);
                 showToast('Template generated successfully', 'success');
             } else {
-                showToast('Error generating template: ' + result.error, 'error');
+                showToast('Error generating template: ' + (result.error || 'Unknown error'), 'error');
             }
         } catch (error) {
             console.error('Error:', error);
@@ -629,28 +629,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function displayGeneratedTemplate(result) {
-        const template = result.template;
         const previewDiv = document.getElementById('aiTemplatePreview');
 
-        // Update preview content
-        document.getElementById('previewName').textContent = template.name;
-        document.getElementById('previewDescription').textContent = template.description;
-        document.getElementById('previewSubject').textContent = template.subject_template;
-        document.getElementById('previewBody').textContent = template.body_template;
+        // Update preview content - handle both possible response structures
+        document.getElementById('previewName').textContent = result.template_name || result.name || 'Generated Template';
+        document.getElementById('previewDescription').textContent = result.description || 'AI-generated email template';
+        document.getElementById('previewSubject').textContent = result.subject_template || result.subject || 'Subject Template';
+        document.getElementById('previewBody').textContent = result.body_template || result.body || 'Body Template';
 
         // Display suggested variables
         const variablesDiv = document.getElementById('previewVariables');
-        if (template.suggested_variables && template.suggested_variables.length > 0) {
-            variablesDiv.innerHTML = template.suggested_variables
-                .map(variable => `<span class="badge bg-primary me-1">{${variable}}</span>`)
+        const placeholders = result.placeholders || result.suggested_variables || [];
+        if (placeholders && placeholders.length > 0) {
+            variablesDiv.innerHTML = placeholders
+                .map(variable => `<span class="badge bg-primary me-1">${variable}</span>`)
                 .join('');
         } else {
             variablesDiv.innerHTML = '<span class="text-muted">No variables suggested</span>';
         }
 
         // Update generation info
+        const generationTime = result.generation_time_ms || 0;
+        const modelUsed = result.model_used || 'AI';
         document.getElementById('generationInfo').textContent = 
-            `Generated in ${(result.generation_time_ms / 1000).toFixed(1)}s using ${result.model_used}`;
+            `Generated in ${(generationTime / 1000).toFixed(1)}s using ${modelUsed}`;
 
         // Show preview and save button
         previewDiv.classList.remove('d-none');
