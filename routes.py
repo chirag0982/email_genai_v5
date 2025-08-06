@@ -92,21 +92,24 @@ def compose():
             ).first()
 
             if email:
-                # Parse JSON fields safely
-                try:
-                    to_addresses = json.loads(email.to_addresses) if email.to_addresses else []
-                except (json.JSONDecodeError, TypeError):
-                    to_addresses = []
+                # Parse recipient addresses (handle both JSON objects and JSON strings)
+                def parse_addresses_compose(addr_field):
+                    if not addr_field:
+                        return []
+                    # If it's already a list (new JSON format), return as is
+                    if isinstance(addr_field, list):
+                        return addr_field
+                    # If it's a string (old JSON string format), parse it
+                    if isinstance(addr_field, str):
+                        try:
+                            return json.loads(addr_field)
+                        except (json.JSONDecodeError, TypeError):
+                            return []
+                    return []
 
-                try:
-                    cc_addresses = json.loads(email.cc_addresses) if email.cc_addresses else []
-                except (json.JSONDecodeError, TypeError):
-                    cc_addresses = []
-
-                try:
-                    bcc_addresses = json.loads(email.bcc_addresses) if email.bcc_addresses else []
-                except (json.JSONDecodeError, TypeError):
-                    bcc_addresses = []
+                to_addresses = parse_addresses_compose(email.to_addresses)
+                cc_addresses = parse_addresses_compose(email.cc_addresses)
+                bcc_addresses = parse_addresses_compose(email.bcc_addresses)
 
                 draft_data = {
                     'id': str(email.id),  # Ensure string format
@@ -210,9 +213,9 @@ def save_draft():
         email.subject = subject
         email.body_html = body_html
         email.body_text = body_text
-        email.to_addresses = json.dumps(to_addresses) # Store as JSON string
-        email.cc_addresses = json.dumps(cc_addresses) # Store as JSON string
-        email.bcc_addresses = json.dumps(bcc_addresses) # Store as JSON string
+        email.to_addresses = to_addresses  # Store as JSON object
+        email.cc_addresses = cc_addresses  # Store as JSON object
+        email.bcc_addresses = bcc_addresses  # Store as JSON object
         email.team_id = team_id  # Update team_id as well
         email.updated_at = datetime.now()
 
@@ -261,19 +264,38 @@ def send_email():
         if not email or email.user_id != current_user.id:
             return jsonify({'success': False, 'error': 'Email not found or access denied'}), 404
 
+        # Parse recipient addresses (handle both JSON objects and JSON strings)
+        def parse_addresses(addr_field):
+            if not addr_field:
+                return []
+            # If it's already a list (new JSON format), return as is
+            if isinstance(addr_field, list):
+                return addr_field
+            # If it's a string (old JSON string format), parse it
+            if isinstance(addr_field, str):
+                try:
+                    return json.loads(addr_field)
+                except (json.JSONDecodeError, TypeError):
+                    return []
+            return []
+
+        to_addresses = parse_addresses(email.to_addresses)
+        cc_addresses = parse_addresses(email.cc_addresses)
+        bcc_addresses = parse_addresses(email.bcc_addresses)
+
         # Validate required fields
-        if not email.to_addresses or not email.subject:
+        if not to_addresses or not email.subject:
             return jsonify({'success': False, 'error': 'To addresses and subject are required'}), 400
 
         # Send email
         result = email_service.send_email(
             user=current_user,
-            to_addresses=email.to_addresses,
+            to_addresses=to_addresses,
             subject=email.subject,
             body_html=email.body_html,
             body_text=email.body_text,
-            cc_addresses=email.cc_addresses,
-            bcc_addresses=email.bcc_addresses,
+            cc_addresses=cc_addresses,
+            bcc_addresses=bcc_addresses,
             email_id=email.id
         )
 
