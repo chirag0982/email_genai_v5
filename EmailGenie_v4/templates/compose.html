@@ -1,0 +1,950 @@
+{% extends "base.html" %}
+
+{% block title %}Compose Email - AI Email Assistant{% endblock %}
+
+{% block extra_head %}
+<style>
+.collaboration-indicator {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    z-index: 10;
+}
+
+.collaborator-cursor {
+    position: absolute;
+    border-left: 2px solid;
+    height: 20px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.collaborator-cursor::after {
+    content: attr(data-user);
+    position: absolute;
+    top: -25px;
+    left: -5px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.ai-suggestion-card {
+    border-left: 4px solid #0d6efd;
+    background: rgba(13, 110, 253, 0.05);
+}
+
+.template-preview {
+    max-height: 200px;
+    overflow-y: auto;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i data-feather="edit"></i>
+                        Compose Email
+                    </h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- Collaboration indicator -->
+                        <div id="collaborationIndicator" class="d-none">
+                            <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#collaborationModal">
+                                <i data-feather="users"></i>
+                                <span id="collaboratorCount">0</span>
+                            </button>
+                        </div>
+
+                        <!-- Save/Send buttons -->
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-secondary" id="saveDraftBtn">
+                                <i data-feather="save"></i> Save Draft
+                            </button>
+                            <button type="button" class="btn btn-primary" id="sendEmailBtn">
+                                <i data-feather="send"></i> Send Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <form id="composeForm">
+                    <input type="hidden" id="emailId" name="email_id" value="">
+
+                    <!-- Team Selection -->
+                    {% if teams %}
+                    <div class="mb-3">
+                        <label for="teamSelect" class="form-label">Team (Optional)</label>
+                        <select class="form-select" id="teamSelect" name="team_id">
+                            <option value="">Personal Email</option>
+                            {% for team in teams %}
+                            <option value="{{ team.id }}">{{ team.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <!-- Recipients -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label for="toAddresses" class="form-label">To</label>
+                            <input type="email" class="form-control" id="toAddresses" name="to_addresses" 
+                                   placeholder="recipient@example.com" multiple required>
+                            <div class="form-text">Separate multiple emails with commas</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="ccAddresses" class="form-label">CC</label>
+                            <input type="email" class="form-control" id="ccAddresses" name="cc_addresses" 
+                                   placeholder="cc@example.com" multiple>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="bccAddresses" class="form-label">BCC</label>
+                            <input type="email" class="form-control" id="bccAddresses" name="bcc_addresses" 
+                                   placeholder="bcc@example.com" multiple>
+                        </div>
+                    </div>
+
+                    <!-- Subject -->
+                    <div class="mb-3 position-relative">
+                        <label for="emailSubject" class="form-label">Subject</label>
+                        <input type="text" class="form-control" id="emailSubject" name="subject" 
+                               placeholder="Enter email subject" required>
+                        <div class="collaboration-indicator">
+                            <div id="subjectCollaborators"></div>
+                        </div>
+                    </div>
+
+                    <!-- Email Body -->
+                    <div class="mb-3 position-relative">
+                        <label for="emailBody" class="form-label">Message</label>
+                        <textarea class="form-control" id="emailBody" name="body_html" rows="12" 
+                                  placeholder="Type your message here or use AI to generate a response..."></textarea>
+                        <div class="collaboration-indicator">
+                            <div id="bodyCollaborators"></div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- AI Generated Response Card -->
+        <div id="aiResponseCard" class="card border-0 shadow-sm mt-4 d-none">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i data-feather="cpu"></i>
+                        AI Generated Response
+                    </h6>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="generationTime" class="badge bg-light text-dark"></span>
+                        <button class="btn btn-sm btn-outline-light" id="useResponseBtn">
+                            <i data-feather="check"></i> Use Response
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="aiGeneratedContent" class="ai-suggestion-card p-3 rounded"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Assistant Sidebar -->
+    <div class="col-lg-4">
+        <!-- AI Generation Controls -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0">
+                    <i data-feather="zap"></i>
+                    AI Assistant
+                </h6>
+            </div>
+            <div class="card-body">
+                <form id="aiGenerationForm">
+                    <!-- Original Email Input -->
+                    <div class="mb-3">
+                        <label for="originalEmail" class="form-label">Original Email</label>
+                        <textarea class="form-control" id="originalEmail" name="original_email" rows="4" 
+                                  placeholder="Paste the email you're replying to..."></textarea>
+                    </div>
+
+                    <!-- Context -->
+                    <div class="mb-3">
+                        <label for="context" class="form-label">Additional Context</label>
+                        <textarea class="form-control" id="context" name="context" rows="2" 
+                                  placeholder="Any additional context or information..."></textarea>
+                    </div>
+
+                    <!-- AI Model Selection -->
+                    <div class="mb-3">
+                        <label for="aiModel" class="form-label">AI Model</label>
+                        <select class="form-select" id="aiModel" name="model">
+                            <option value="auto">Auto-Select Best Model</option>
+                            {% for model in ai_models %}
+                            <option value="{{ model.value }}">{{ model.value.replace('-', ' ').title() }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Tone Selection -->
+                    <div class="mb-3">
+                        <label for="emailTone" class="form-label">Tone</label>
+                        <select class="form-select" id="emailTone" name="tone">
+                            {% for tone in email_tones %}
+                            <option value="{{ tone.value }}" {{ 'selected' if tone.value == 'professional' else '' }}>
+                                {{ tone.value.title() }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Custom Instructions -->
+                    <div class="mb-3">
+                        <label for="customInstructions" class="form-label">Custom Instructions</label>
+                        <textarea class="form-control" id="customInstructions" name="custom_instructions" rows="2" 
+                                  placeholder="Any specific instructions for the AI..."></textarea>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="generateReplyBtn">
+                            <i data-feather="cpu"></i>
+                            Generate AI Reply
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Email Templates -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i data-feather="file-text"></i>
+                        Templates
+                    </h6>
+                    <a href="{{ url_for('templates') }}" class="btn btn-sm btn-outline-primary">
+                        <i data-feather="plus"></i> New
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if templates %}
+                <div class="accordion" id="templatesAccordion">
+                    {% for template in templates[:5] %}
+                    <div class="accordion-item border-0 mb-2">
+                        <h6 class="accordion-header">
+                            <button class="accordion-button collapsed py-2" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#template{{ loop.index }}">
+                                <small class="fw-medium">{{ template.name }}</small>
+                            </button>
+                        </h6>
+                        <div id="template{{ loop.index }}" class="accordion-collapse collapse">
+                            <div class="accordion-body py-2">
+                                <div class="template-preview mb-2">
+                                    <small class="text-muted">{{ template.description or 'No description' }}</small>
+                                    {% if template.subject_template %}
+                                    <div class="mt-1">
+                                        <strong class="small">Subject:</strong>
+                                        <small class="d-block">{{ template.subject_template }}</small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary w-100 use-template-btn" 
+                                        data-template-id="{{ template.id }}"
+                                        data-subject="{{ template.subject_template or '' }}"
+                                        data-body="{{ template.body_template or '' }}">
+                                    <i data-feather="copy"></i> Use Template
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if templates|length > 5 %}
+                <div class="text-center mt-2">
+                    <a href="{{ url_for('templates') }}" class="btn btn-sm btn-outline-secondary">
+                        View All Templates
+                    </a>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="text-center py-3">
+                    <i data-feather="file-text" class="text-muted mb-2"></i>
+                    <p class="text-muted mb-0 small">No templates yet</p>
+                    <a href="{{ url_for('templates') }}" class="small">Create your first template</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="mb-0">
+                    <i data-feather="zap"></i>
+                    Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-info btn-sm" id="analyzeSentimentBtn">
+                        <i data-feather="heart"></i> Analyze Sentiment
+                    </button>
+                    <button class="btn btn-outline-warning btn-sm" id="suggestImprovementsBtn">
+                        <i data-feather="edit"></i> Suggest Improvements
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="clearFormBtn">
+                        <i data-feather="refresh-cw"></i> Clear Form
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sentiment Analysis Modal -->
+<div class="modal fade" id="sentimentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Email Sentiment Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="sentimentResults"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Improvements Modal -->
+<div class="modal fade" id="improvementsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">AI Suggestions for Improvement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="improvementResults"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="applyImprovementsBtn">Apply Suggestions</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const composeForm = document.getElementById('composeForm');
+    const aiGenerationForm = document.getElementById('aiGenerationForm');
+    const emailBody = document.getElementById('emailBody');
+    const emailSubject = document.getElementById('emailSubject');
+
+    let currentEmailId = null;
+    let isCollaborating = false;
+
+    // Auto-save draft functionality
+    let autoSaveTimer;
+    function startAutoSave() {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(saveDraft, 30000); // Auto-save every 30 seconds
+    }
+
+    // Add event listeners for auto-save
+    [emailBody, emailSubject, document.getElementById('toAddresses')].forEach(element => {
+        element.addEventListener('input', startAutoSave);
+    });
+
+    // Template usage
+    document.querySelectorAll('.use-template-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const subject = this.dataset.subject;
+            const body = this.dataset.body;
+
+            if (subject) emailSubject.value = subject;
+            if (body) emailBody.value = body;
+
+            showToast('Template applied successfully', 'success');
+        });
+    });
+
+    // AI Generation Form
+    aiGenerationForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        generateAIReply();
+    });
+
+    // Save Draft
+    document.getElementById('saveDraftBtn').addEventListener('click', saveDraft);
+
+    // Load draft data if provided
+    {% if draft_data %}
+    try {
+        // Load existing draft data using safe JSON parsing
+        const draftData = {{ draft_data | tojsonfilter | safe }};
+        console.log('Loading draft data:', draftData);
+        
+        if (draftData) {
+            currentEmailId = draftData.id;
+            const emailIdInput = document.getElementById('emailId');
+            if (emailIdInput) {
+                emailIdInput.value = currentEmailId;
+            }
+            
+            // Load subject
+            if (draftData.subject) {
+                emailSubject.value = draftData.subject;
+                console.log('Loaded subject:', draftData.subject);
+            }
+            
+            // Load body content with multiple attempts to ensure visibility
+            if (draftData.body_html) {
+                emailBody.value = draftData.body_html;
+                console.log('Loaded HTML body content:', draftData.body_html);
+            } else if (draftData.body_text) {
+                emailBody.value = draftData.body_text;
+                console.log('Loaded text body content:', draftData.body_text);
+            }
+            
+            // Force refresh of textarea content
+            if (emailBody.value) {
+                const content = emailBody.value;
+                emailBody.value = '';
+                setTimeout(() => {
+                    emailBody.value = content;
+                    emailBody.focus();
+                    emailBody.blur();
+                    // Trigger multiple events to ensure content is visible
+                    emailBody.dispatchEvent(new Event('input', { bubbles: true }));
+                    emailBody.dispatchEvent(new Event('change', { bubbles: true }));
+                    emailBody.dispatchEvent(new Event('keyup', { bubbles: true }));
+                    console.log('Content restored and events triggered');
+                }, 100);
+            }
+            
+            // Load recipients
+            if (draftData.to_addresses) {
+                if (Array.isArray(draftData.to_addresses)) {
+                    if (draftData.to_addresses.length > 0) {
+                        document.getElementById('toAddresses').value = draftData.to_addresses.join(', ');
+                    }
+                }
+            }
+            
+            if (draftData.cc_addresses) {
+                if (Array.isArray(draftData.cc_addresses)) {
+                    if (draftData.cc_addresses.length > 0) {
+                        document.getElementById('ccAddresses').value = draftData.cc_addresses.join(', ');
+                    }
+                }
+            }
+            
+            if (draftData.bcc_addresses) {
+                if (Array.isArray(draftData.bcc_addresses)) {
+                    if (draftData.bcc_addresses.length > 0) {
+                        document.getElementById('bccAddresses').value = draftData.bcc_addresses.join(', ');
+                    }
+                }
+            }
+            
+            // Load team selection
+            const teamSelect = document.getElementById('teamSelect');
+            if (draftData.team_id) {
+                if (teamSelect) {
+                    teamSelect.value = draftData.team_id;
+                }
+            }
+            
+            if (typeof showToast === 'function') {
+                showToast('Draft loaded successfully', 'success');
+            }
+            console.log('Draft loaded successfully');
+        }
+    } catch (error) {
+        console.error('Error loading draft data:', error);
+        if (typeof showToast === 'function') {
+            showToast('Error loading draft data', 'error');
+        }
+    }
+    {% endif %}
+
+    // Send Email
+    document.getElementById('sendEmailBtn').addEventListener('click', sendEmail);
+
+    // Clear Form
+    document.getElementById('clearFormBtn').addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear the form?')) {
+            composeForm.reset();
+            document.getElementById('aiResponseCard').classList.add('d-none');
+            currentEmailId = null;
+        }
+    });
+
+    // Sentiment Analysis
+    document.getElementById('analyzeSentimentBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        analyzeSentiment();
+    });
+
+    // Suggest Improvements
+    document.getElementById('suggestImprovementsBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        suggestImprovements();
+    });
+
+    // Use AI Response
+    document.getElementById('useResponseBtn').addEventListener('click', function() {
+        const aiContent = document.getElementById('aiGeneratedContent').textContent;
+        const lines = aiContent.split('\n');
+
+        // Extract subject and body from AI response
+        let subject = '';
+        let body = '';
+        let isBody = false;
+
+        lines.forEach(line => {
+            if (line.startsWith('Subject:')) {
+                subject = line.replace('Subject:', '').trim();
+            } else if (isBody || (!line.startsWith('Subject:') && line.trim() !== '')) {
+                isBody = true;
+                if (line.trim() !== 'Subject:') {
+                    body += line + '\n';
+                }
+            }
+        });
+
+        if (subject) emailSubject.value = subject;
+        if (body) emailBody.value = body.trim();
+
+        document.getElementById('aiResponseCard').classList.add('d-none');
+        showToast('AI response applied to email', 'success');
+    });
+
+    async function generateAIReply() {
+        const generateBtn = document.getElementById('generateReplyBtn');
+        const originalBtn = generateBtn.innerHTML;
+
+        try {
+            generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+            generateBtn.disabled = true;
+
+            showLoadingOverlay('Generating AI response...');
+
+            const formData = new FormData(aiGenerationForm);
+            const data = Object.fromEntries(formData.entries());
+
+            // Emit WebSocket event for collaboration
+            if (window.socket && currentEmailId) {
+                window.socket.emit('ai_generation_start', {
+                    email_id: currentEmailId,
+                    model: data.model
+                });
+            }
+
+            const response = await fetch('/api/generate-reply', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Handle content display properly
+                let content = '';
+                if (result.subject && result.subject !== 'Re: Email Reply') {
+                    content += `Subject: ${result.subject}\n\n`;
+                }
+                if (result.body && result.body.trim()) {
+                    content += result.body.trim();
+                } else if (result.content && result.content.trim()) {
+                    content += result.content.trim();
+                } else {
+                    content += 'AI generated content is ready to use.';
+                }
+                
+                document.getElementById('aiGeneratedContent').textContent = content;
+                document.getElementById('aiGeneratedContent').style.whiteSpace = 'pre-wrap';
+                
+                // Display generation info
+                const modelName = result.model_used === 'qwen-4-turbo' ? 'Qwen-4' : (result.model_used || 'AI');
+                document.getElementById('generationTime').textContent = `Generated in ${(result.generation_time_ms / 1000).toFixed(1)}s using ${modelName}`;
+                document.getElementById('aiResponseCard').classList.remove('d-none');
+
+                // Emit WebSocket event
+                if (window.socket && currentEmailId) {
+                    window.socket.emit('ai_generation_complete', {
+                        email_id: currentEmailId,
+                        content: result.content,
+                        model_used: result.model_used,
+                        generation_time_ms: result.generation_time_ms
+                    });
+                }
+
+                showToast('AI reply generated successfully', 'success');
+            } else {
+                showToast('Error generating AI reply: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Network error while generating reply', 'error');
+        } finally {
+            generateBtn.innerHTML = originalBtn;
+            generateBtn.disabled = false;
+            hideLoadingOverlay();
+        }
+    }
+
+    async function saveDraft() {
+        try {
+            // Get form values directly to ensure they're captured
+            const formData = {
+                subject: emailSubject.value,
+                body_html: emailBody.value,
+                body_text: emailBody.value,
+                to_addresses: document.getElementById('toAddresses').value ? 
+                    document.getElementById('toAddresses').value.split(',').map(e => e.trim()) : [],
+                cc_addresses: document.getElementById('ccAddresses').value ? 
+                    document.getElementById('ccAddresses').value.split(',').map(e => e.trim()) : [],
+                bcc_addresses: document.getElementById('bccAddresses').value ? 
+                    document.getElementById('bccAddresses').value.split(',').map(e => e.trim()) : [],
+                team_id: document.getElementById('teamSelect') ? 
+                    (document.getElementById('teamSelect').value || null) : null
+            };
+
+            if (currentEmailId) {
+                formData.email_id = currentEmailId;
+            }
+
+            const response = await fetch('/api/save-draft', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                currentEmailId = result.email_id;
+                document.getElementById('emailId').value = currentEmailId;
+                showToast('Draft saved successfully', 'success');
+
+                // Don't clear the form - keep the content
+                // Start collaboration if not already
+                if (!isCollaborating && window.socket) {
+                    startCollaboration(currentEmailId);
+                }
+            } else {
+                showToast('Error saving draft: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Network error while saving draft', 'error');
+        }
+    }
+
+    async function sendEmail() {
+        if (!currentEmailId) {
+            await saveDraft();
+            if (!currentEmailId) {
+                showToast('Please save draft first', 'error');
+                return;
+            }
+        }
+
+        // Validate required fields
+        const toAddresses = document.getElementById('toAddresses').value.trim();
+        const subject = emailSubject.value.trim();
+
+        if (!toAddresses || !subject) {
+            showToast('Please fill in recipient email and subject', 'error');
+            return;
+        }
+
+        if (confirm('Are you sure you want to send this email?')) {
+            try {
+                const response = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email_id: currentEmailId })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Email sent successfully!', 'success');
+
+                    // Emit WebSocket event
+                    if (window.socket) {
+                        window.socket.emit('email_sent', {
+                            email_id: currentEmailId,
+                            recipients: toAddresses.split(',').map(e => e.trim())
+                        });
+                    }
+
+                    // Redirect to dashboard after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 2000);
+                } else {
+                    showToast('Error sending email: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Network error while sending email', 'error');
+            }
+        }
+    }
+
+    async function analyzeSentiment() {
+        const content = emailBody.value.trim();
+        if (!content) {
+            showToast('Please enter email content first', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/analyze-sentiment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email_content: content })
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.analysis && !result.analysis.error) {
+                const analysis = result.analysis;
+                const resultsDiv = document.getElementById('sentimentResults');
+
+                resultsDiv.innerHTML = `
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body text-center">
+                                    <h6>Sentiment</h6>
+                                    <span class="badge bg-${analysis.sentiment === 'positive' ? 'success' : analysis.sentiment === 'negative' ? 'danger' : 'secondary'} fs-6">
+                                        ${analysis.sentiment || 'N/A'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body text-center">
+                                    <h6>Urgency</h6>
+                                    <span class="badge bg-${analysis.urgency === 'high' ? 'danger' : analysis.urgency === 'medium' ? 'warning' : 'info'} fs-6">
+                                        ${analysis.urgency || 'N/A'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body text-center">
+                                    <h6>Tone</h6>
+                                    <span class="badge bg-primary fs-6">
+                                        ${analysis.tone || 'Not detected'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        ${analysis.emotion_score !== undefined ? `
+                        <div class="col-12">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <h6>Emotion Score</h6>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-${analysis.emotion_score > 0.6 ? 'success' : analysis.emotion_score > 0.4 ? 'warning' : 'danger'}" 
+                                             style="width: ${Math.max(0, Math.min(100, analysis.emotion_score * 100))}%"></div>
+                                    </div>
+                                    <small class="text-muted">${Math.round(analysis.emotion_score * 100)}/100</small>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        ${analysis.key_topics && analysis.key_topics.length > 0 ? `
+                        <div class="col-12">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <h6>Key Topics</h6>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        ${analysis.key_topics.map(topic => `<span class="badge bg-primary">${topic}</span>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                new bootstrap.Modal(document.getElementById('sentimentModal')).show();
+            } else {
+                showToast('Error analyzing sentiment: ' + (result.analysis?.error || result.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Network error while analyzing sentiment', 'error');
+        }
+    }
+
+    async function suggestImprovements() {
+        const content = emailBody.value.trim();
+        if (!content) {
+            showToast('Please enter email content first', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/suggest-improvements', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email_content: content })
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.suggestions && !result.error) {
+                const suggestions = result.suggestions;
+                const metrics = result.analysis_metrics || {};
+                const resultsDiv = document.getElementById('improvementResults');
+
+                resultsDiv.innerHTML = `
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body text-center">
+                                    <h6>Clarity Score</h6>
+                                    <span class="badge bg-${metrics.clarity_score >= 8 ? 'success' : metrics.clarity_score >= 6 ? 'warning' : 'danger'} fs-6">
+                                        ${metrics.clarity_score || 'N/A'}/10
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body text-center">
+                                    <h6>Professionalism</h6>
+                                    <span class="badge bg-${metrics.professionalism_score >= 8 ? 'success' : metrics.professionalism_score >= 6 ? 'warning' : 'danger'} fs-6">
+                                        ${metrics.professionalism_score || 'N/A'}/10
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body text-center">
+                                    <h6>Engagement</h6>
+                                    <span class="badge bg-${metrics.engagement_score >= 8 ? 'success' : metrics.engagement_score >= 6 ? 'warning' : 'danger'} fs-6">
+                                        ${metrics.engagement_score || 'N/A'}/10
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${suggestions && suggestions.length > 0 ? `
+                    <div class="mb-4">
+                        <h6>AI-Powered Improvement Suggestions</h6>
+                        <ul class="list-group list-group-flush">
+                            ${suggestions.map(suggestion => `<li class="list-group-item border-0 bg-light">${suggestion}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : '<div class="alert alert-info">No specific improvements suggested - your email looks good!</div>'}
+
+                    ${result.improved_email ? `
+                    <div class="mb-4">
+                        <h6>Improved Email Version</h6>
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <div id="improvedVersion" style="white-space: pre-wrap; font-family: 'Monaco', 'Consolas', monospace; background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">${result.improved_email}</div>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            Analysis completed in ${metrics.total_analysis_time_ms || 0}ms using ${metrics.model_used || 'AI'} 
+                            (Method: ${metrics.method || 'analysis'})
+                        </small>
+                    </div>
+                `;
+
+                new bootstrap.Modal(document.getElementById('improvementsModal')).show();
+            } else {
+                showToast('Error getting suggestions: ' + (result.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Network error while getting suggestions', 'error');
+        }
+    }
+
+    // Apply improvements
+    document.getElementById('applyImprovementsBtn').addEventListener('click', function() {
+        const improvedVersion = document.getElementById('improvedVersion');
+        if (improvedVersion) {
+            emailBody.value = improvedVersion.textContent;
+            bootstrap.Modal.getInstance(document.getElementById('improvementsModal')).hide();
+            showToast('Improvements applied to email', 'success');
+        }
+    });
+
+    // Collaboration functions
+    function startCollaboration(emailId) {
+        if (window.socket) {
+            window.socket.emit('join_collaboration', { email_id: emailId });
+            isCollaborating = true;
+        }
+    }
+
+    // Check for URL parameters (editing existing email)
+    const urlParams = new URLSearchParams(window.location.search);
+    const editEmailId = urlParams.get('edit') || urlParams.get('email_id');
+    if (editEmailId) {
+        currentEmailId = editEmailId;
+        const emailIdInput = document.getElementById('emailId');
+        if (emailIdInput) {
+            emailIdInput.value = editEmailId;
+        }
+        if (window.socket) {
+            startCollaboration(editEmailId);
+        }
+        console.log('Edit mode activated for email ID:', editEmailId);
+    }
+});
+</script>
+{% endblock %}

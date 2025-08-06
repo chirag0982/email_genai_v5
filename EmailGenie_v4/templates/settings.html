@@ -1,0 +1,554 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - AI Email Assistant{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Settings</h1>
+                <p class="text-muted mb-0">Manage your account and email preferences</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Settings Navigation -->
+    <div class="col-lg-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <nav class="nav nav-pills flex-column">
+                    <a class="nav-link active" data-bs-toggle="pill" href="#profile-tab">
+                        <i data-feather="user"></i> Profile
+                    </a>
+                    <a class="nav-link" data-bs-toggle="pill" href="#email-tab">
+                        <i data-feather="mail"></i> Email Configuration
+                    </a>
+                    <a class="nav-link" data-bs-toggle="pill" href="#ai-tab">
+                        <i data-feather="cpu"></i> AI Preferences
+                    </a>
+                    <a class="nav-link" data-bs-toggle="pill" href="#notifications-tab">
+                        <i data-feather="bell"></i> Notifications
+                    </a>
+                    <a class="nav-link" data-bs-toggle="pill" href="#security-tab">
+                        <i data-feather="shield"></i> Security
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Settings Content -->
+    <div class="col-lg-9">
+        <div class="tab-content">
+            <!-- Profile Settings -->
+            <div class="tab-pane fade show active" id="profile-tab">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0">Profile Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="profileForm">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="firstName" class="form-label">First Name</label>
+                                    <input type="text" class="form-control" id="firstName" 
+                                           value="{{ user.first_name or '' }}" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="lastName" class="form-label">Last Name</label>
+                                    <input type="text" class="form-control" id="lastName" 
+                                           value="{{ user.last_name or '' }}" readonly>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" 
+                                       value="{{ user.email or '' }}" readonly>
+                                <div class="form-text">
+                                    Profile information is managed through your authentication provider.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Profile Picture</label>
+                                <div class="d-flex align-items-center">
+                                    {% if user.profile_image_url %}
+                                    <img src="{{ user.profile_image_url }}" alt="Profile" 
+                                         class="rounded-circle me-3" width="64" height="64" style="object-fit: cover;">
+                                    {% else %}
+                                    <div class="bg-secondary bg-opacity-25 rounded-circle me-3 d-flex align-items-center justify-content-center" 
+                                         style="width: 64px; height: 64px;">
+                                        <i data-feather="user" style="width: 24px; height: 24px;"></i>
+                                    </div>
+                                    {% endif %}
+                                    <small class="text-muted">
+                                        Profile picture is managed through your authentication provider.
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info" role="alert">
+                                <i data-feather="info" class="me-2"></i>
+                                <strong>Note:</strong> Profile information is synchronized with your authentication provider and cannot be edited here.
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Email Configuration -->
+            <div class="tab-pane fade" id="email-tab">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0">Email Server Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="emailConfigForm">
+                            <!-- Provider Selection -->
+                            <div class="mb-3">
+                                <label for="emailProvider" class="form-label">Email Provider</label>
+                                <select class="form-select" id="emailProvider">
+                                    <option value="custom">Custom SMTP</option>
+                                    <option value="gmail">Gmail</option>
+                                    <option value="outlook">Outlook/Hotmail</option>
+                                    <option value="yahoo">Yahoo Mail</option>
+                                </select>
+                            </div>
+                            
+                            <!-- SMTP Settings -->
+                            <div class="row mb-3">
+                                <div class="col-md-8">
+                                    <label for="smtpServer" class="form-label">SMTP Server</label>
+                                    <input type="text" class="form-control" id="smtpServer" 
+                                           value="{{ user.smtp_server or '' }}" placeholder="smtp.example.com">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="smtpPort" class="form-label">Port</label>
+                                    <input type="number" class="form-control" id="smtpPort" 
+                                           value="{{ user.smtp_port or 587 }}" placeholder="587">
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="smtpUsername" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="smtpUsername" 
+                                           value="{{ user.smtp_username or '' }}" placeholder="your-email@example.com">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="smtpPassword" class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="smtpPassword" 
+                                           placeholder="Enter your email password">
+                                    <div class="form-text">
+                                        For Gmail, use an App Password instead of your regular password.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="smtpUseTls" 
+                                           {{ 'checked' if user.smtp_use_tls else '' }}>
+                                    <label class="form-check-label" for="smtpUseTls">
+                                        Use TLS encryption (recommended)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- Provider Instructions -->
+                            <div id="providerInstructions" class="alert alert-info d-none">
+                                <h6>Setup Instructions:</h6>
+                                <div id="instructionsContent"></div>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary" id="testConnectionBtn">
+                                    <i data-feather="wifi"></i> Test Connection
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i data-feather="save"></i> Save Configuration
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AI Preferences -->
+            <div class="tab-pane fade" id="ai-tab">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0">AI Model Preferences</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="aiPreferencesForm">
+                            <div class="mb-3">
+                                <label for="preferredModel" class="form-label">Preferred AI Model</label>
+                                <select class="form-select" id="preferredModel">
+                                    <option value="auto">Auto-select best model</option>
+                                    {% for model in ai_models %}
+                                    <option value="{{ model.value }}" 
+                                            {{ 'selected' if user.preferred_ai_model and user.preferred_ai_model.value == model.value else '' }}>
+                                        {{ model.value.replace('-', ' ').title() }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">
+                                    Choose your default AI model for email generation.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="defaultTone" class="form-label">Default Email Tone</label>
+                                <select class="form-select" id="defaultTone">
+                                    {% for tone in email_tones %}
+                                    <option value="{{ tone.value }}" 
+                                            {{ 'selected' if user.default_tone and user.default_tone.value == tone.value else '' }}>
+                                        {{ tone.value.title() }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <!-- AI Model Information -->
+                            <div class="mb-3">
+                                <label class="form-label">Available AI Models</label>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <div class="card border border-primary border-opacity-25">
+                                            <div class="card-body text-center p-3">
+                                                <i data-feather="cpu" class="text-primary mb-2"></i>
+                                                <h6 class="mb-1">Qwen-4 Turbo</h6>
+                                                <small class="text-muted">Best for professional emails</small>
+                                                <div class="mt-2">
+                                                    <span class="badge bg-primary">Fast</span>
+                                                    <span class="badge bg-success">Accurate</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card border border-success border-opacity-25">
+                                            <div class="card-body text-center p-3">
+                                                <i data-feather="brain" class="text-success mb-2"></i>
+                                                <h6 class="mb-1">Claude-4 Sonnet</h6>
+                                                <small class="text-muted">Best for complex analysis</small>
+                                                <div class="mt-2">
+                                                    <span class="badge bg-success">Creative</span>
+                                                    <span class="badge bg-info">Detailed</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card border border-warning border-opacity-25">
+                                            <div class="card-body text-center p-3">
+                                                <i data-feather="zap" class="text-warning mb-2"></i>
+                                                <h6 class="mb-1">GPT-4o</h6>
+                                                <small class="text-muted">Best for quick responses</small>
+                                                <div class="mt-2">
+                                                    <span class="badge bg-warning">Quick</span>
+                                                    <span class="badge bg-primary">Concise</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i data-feather="save"></i> Save Preferences
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Notifications -->
+            <div class="tab-pane fade" id="notifications-tab">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0">Notification Preferences</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="notificationsForm">
+                            <div class="mb-4">
+                                <h6>Email Notifications</h6>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="emailSent" checked>
+                                    <label class="form-check-label" for="emailSent">
+                                        Email sent successfully
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="emailFailed" checked>
+                                    <label class="form-check-label" for="emailFailed">
+                                        Email delivery failed
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="teamInvite" checked>
+                                    <label class="form-check-label" for="teamInvite">
+                                        Team invitations and updates
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <h6>Collaboration Notifications</h6>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="collaborate" checked>
+                                    <label class="form-check-label" for="collaborate">
+                                        Someone joins my email collaboration
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="mentions">
+                                    <label class="form-check-label" for="mentions">
+                                        Mentions in email comments
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <h6>System Notifications</h6>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="maintenance">
+                                    <label class="form-check-label" for="maintenance">
+                                        Scheduled maintenance notifications
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="features" checked>
+                                    <label class="form-check-label" for="features">
+                                        New feature announcements
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i data-feather="save"></i> Save Preferences
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Security -->
+            <div class="tab-pane fade" id="security-tab">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0">Security & Privacy</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <h6>Account Security</h6>
+                            <div class="alert alert-info" role="alert">
+                                <i data-feather="shield" class="me-2"></i>
+                                Your account security is managed through your authentication provider.
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                <div>
+                                    <div class="fw-medium">Two-Factor Authentication</div>
+                                    <small class="text-muted">Managed by your authentication provider</small>
+                                </div>
+                                <span class="badge bg-success">Active</span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                <div>
+                                    <div class="fw-medium">Password Management</div>
+                                    <small class="text-muted">Change password through your provider</small>
+                                </div>
+                                <span class="badge bg-secondary">External</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h6>Privacy Settings</h6>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="analytics" checked>
+                                <label class="form-check-label" for="analytics">
+                                    Allow usage analytics for service improvement
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sharing">
+                                <label class="form-check-label" for="sharing">
+                                    Allow sharing anonymized data for AI model training
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h6>Data Management</h6>
+                            <div class="d-grid gap-2 d-md-block">
+                                <button type="button" class="btn btn-outline-primary">
+                                    <i data-feather="download"></i> Export My Data
+                                </button>
+                                <button type="button" class="btn btn-outline-warning">
+                                    <i data-feather="trash-2"></i> Delete My Account
+                                </button>
+                            </div>
+                            <small class="text-muted d-block mt-2">
+                                Account deletion will permanently remove all your data and cannot be undone.
+                            </small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i data-feather="save"></i> Save Security Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const emailProvider = document.getElementById('emailProvider');
+    const smtpProviders = {{ smtp_providers | tojson }};
+    
+    // Provider selection handler
+    emailProvider.addEventListener('change', function() {
+        const provider = this.value;
+        const settings = smtpProviders[provider];
+        
+        if (settings) {
+            document.getElementById('smtpServer').value = settings.smtp_server;
+            document.getElementById('smtpPort').value = settings.smtp_port;
+            document.getElementById('smtpUseTls').checked = settings.use_tls;
+            
+            // Show instructions
+            const instructionsDiv = document.getElementById('providerInstructions');
+            const instructionsContent = document.getElementById('instructionsContent');
+            
+            if (settings.instructions) {
+                instructionsContent.innerHTML = settings.instructions;
+                instructionsDiv.classList.remove('d-none');
+            } else {
+                instructionsDiv.classList.add('d-none');
+            }
+        }
+    });
+    
+    // Test connection
+    document.getElementById('testConnectionBtn').addEventListener('click', async function() {
+        const btn = this;
+        const originalText = btn.innerHTML;
+        
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Testing...';
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/test-smtp-connection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    smtp_server: document.getElementById('smtpServer').value,
+                    smtp_port: parseInt(document.getElementById('smtpPort').value),
+                    smtp_username: document.getElementById('smtpUsername').value,
+                    smtp_password: document.getElementById('smtpPassword').value,
+                    smtp_use_tls: document.getElementById('smtpUseTls').checked
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('SMTP connection successful!', 'success');
+            } else {
+                showToast('Connection failed: ' + result.error, 'error');
+            }
+        } catch (error) {
+            showToast('Network error during connection test', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
+    
+    // Email configuration form
+    document.getElementById('emailConfigForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        try {
+            const response = await fetch('/api/update-smtp-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    smtp_server: document.getElementById('smtpServer').value,
+                    smtp_port: parseInt(document.getElementById('smtpPort').value),
+                    smtp_username: document.getElementById('smtpUsername').value,
+                    smtp_password: document.getElementById('smtpPassword').value,
+                    smtp_use_tls: document.getElementById('smtpUseTls').checked
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('Email configuration saved successfully!', 'success');
+            } else {
+                showToast('Error saving configuration: ' + result.error, 'error');
+            }
+        } catch (error) {
+            showToast('Network error while saving configuration', 'error');
+        }
+    });
+    
+    // AI preferences form
+    document.getElementById('aiPreferencesForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        try {
+            const response = await fetch('/api/update-ai-preferences', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    preferred_ai_model: document.getElementById('preferredModel').value,
+                    default_tone: document.getElementById('defaultTone').value
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('AI preferences saved successfully!', 'success');
+            } else {
+                showToast('Error saving preferences: ' + result.error, 'error');
+            }
+        } catch (error) {
+            showToast('Network error while saving preferences', 'error');
+        }
+    });
+    
+    // Auto-select provider based on current settings
+    const currentServer = '{{ user.smtp_server or "" }}';
+    if (currentServer.includes('gmail.com')) {
+        emailProvider.value = 'gmail';
+    } else if (currentServer.includes('outlook.com') || currentServer.includes('hotmail.com')) {
+        emailProvider.value = 'outlook';
+    } else if (currentServer.includes('yahoo.com')) {
+        emailProvider.value = 'yahoo';
+    }
+    
+    // Trigger change event to show instructions
+    emailProvider.dispatchEvent(new Event('change'));
+});
+</script>
+{% endblock %}

@@ -1,0 +1,55 @@
+modules = ["python-3.11", "postgresql-16"]
+[deployment]
+run = ["python", "hybrid_main.py"]
+deploymentTarget = "cloudrun"
+
+[nix]
+channel = "stable-24_05"
+packages = ["bash", "iana-etc", "libxcrypt"]
+
+[languages.python3]
+pattern = "**/*.py"
+
+[languages.python3.languageServer]
+start = "pylsp"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[objectStorage]
+defaultBucketID = "replit-objstore-2671be20-ff2f-4b45-b882-bc823dc5b905"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "AI Email Assistant"
+author = 46041504
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python hybrid_main.py"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Hybrid App"
+
+[[workflows.workflow]]
+name = "Hybrid App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 hybrid_main.py"
+waitForPort = 5000

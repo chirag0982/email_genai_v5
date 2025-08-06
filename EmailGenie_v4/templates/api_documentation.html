@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}API Documentation - AI Email Assistant{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">
+                    <i data-feather="book-open"></i>
+                    API Documentation
+                </h1>
+                <div class="btn-group" role="group">
+                    <a href="/api/v1/status" class="btn btn-outline-primary" target="_blank">
+                        <i data-feather="activity"></i> Service Status
+                    </a>
+                    <a href="/api/docs" class="btn btn-primary" target="_blank">
+                        <i data-feather="external-link"></i> FastAPI Interactive Docs
+                    </a>
+                </div>
+            </div>
+
+            <!-- Service Overview -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i data-feather="server"></i>
+                                Flask Frontend Service
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Port:</strong> 5000</p>
+                            <p><strong>Base URL:</strong> <code>http://localhost:5000</code></p>
+                            <p><strong>Features:</strong></p>
+                            <ul>
+                                <li>Web Interface & Templates</li>
+                                <li>User Authentication (Replit Auth)</li>
+                                <li>Database Management</li>
+                                <li>Real-time WebSocket Features</li>
+                                <li>Team Collaboration</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i data-feather="zap"></i>
+                                FastAPI Backend Service
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Port:</strong> 8000</p>
+                            <p><strong>Base URL:</strong> <code>http://localhost:8000</code></p>
+                            <p><strong>Features:</strong></p>
+                            <ul>
+                                <li>High-Performance Async API</li>
+                                <li>LangChain AI Orchestration</li>
+                                <li>Bulk Email Processing</li>
+                                <li>Advanced AI Model Management</li>
+                                <li>Automatic API Documentation</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Endpoints -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="list"></i>
+                        Available API Endpoints
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Flask Endpoints (Port 5000)</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Method</th>
+                                            <th>Endpoint</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/</code></td>
+                                            <td>Landing page</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/dashboard</code></td>
+                                            <td>User dashboard</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/compose</code></td>
+                                            <td>Email composition</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">POST</span></td>
+                                            <td><code>/api/generate-reply</code></td>
+                                            <td>Generate AI email reply</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">POST</span></td>
+                                            <td><code>/api/save-draft</code></td>
+                                            <td>Save email draft</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/api/v1/status</code></td>
+                                            <td>Service status</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/docs</code></td>
+                                            <td>Redirect to FastAPI docs</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>FastAPI Endpoints (Port 8000)</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Method</th>
+                                            <th>Endpoint</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/</code></td>
+                                            <td>FastAPI health check</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/api/v1/models</code></td>
+                                            <td>Available AI models</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">POST</span></td>
+                                            <td><code>/api/v1/generate-email</code></td>
+                                            <td>LangChain email generation</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">POST</span></td>
+                                            <td><code>/api/v1/analyze-email</code></td>
+                                            <td>Email sentiment analysis</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">POST</span></td>
+                                            <td><code>/api/v1/bulk-generate</code></td>
+                                            <td>Bulk email processing</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/api/v1/health</code></td>
+                                            <td>Detailed health check</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">POST</span></td>
+                                            <td><code>/api/v1/generate-template</code></td>
+                                            <td>AI template generation</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">POST</span></td>
+                                            <td><code>/api/v1/langchain-query</code></td>
+                                            <td>LangChain conversational agent</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">POST</span></td>
+                                            <td><code>/api/v1/enhanced-generate</code></td>
+                                            <td>Enhanced email generation with chains</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">POST</span></td>
+                                            <td><code>/api/v1/enhanced-analyze</code></td>
+                                            <td>Enhanced email analysis with LangChain</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/api/v1/langchain-status</code></td>
+                                            <td>LangChain integration status</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-success">GET</span></td>
+                                            <td><code>/docs</code></td>
+                                            <td>Interactive API docs</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Models -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="cpu"></i>
+                        AI Models Configuration
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <strong>Qwen-4 Turbo</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Provider:</strong> OpenRouter</p>
+                                    <p><strong>Model ID:</strong> <code>qwen/qwen3-30b-a3b-instruct-2507</code></p>
+                                    <p><strong>Use Cases:</strong> Professional, Technical, Detailed</p>
+                                    <p><strong>LangChain:</strong> ✅ Available</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <strong>Claude-4 Sonnet</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Provider:</strong> Anthropic</p>
+                                    <p><strong>Model ID:</strong> <code>claude-sonnet-4-20250514</code></p>
+                                    <p><strong>Use Cases:</strong> Creative, Analytical, Complex</p>
+                                    <p><strong>LangChain:</strong> ⚠️ Requires API Key</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <strong>GPT-4o</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Provider:</strong> OpenAI</p>
+                                    <p><strong>Model ID:</strong> <code>gpt-4o</code></p>
+                                    <p><strong>Use Cases:</strong> Concise, Urgent, Simple</p>
+                                    <p><strong>LangChain:</strong> ⚠️ Requires API Key</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="play-circle"></i>
+                        Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="/api/docs" class="btn btn-primary" target="_blank">
+                            <i data-feather="external-link"></i> Open Interactive FastAPI Docs
+                        </a>
+                        <a href="/api/v1/status" class="btn btn-outline-info" target="_blank">
+                            <i data-feather="activity"></i> Check Service Status
+                        </a>
+                        <button class="btn btn-outline-success" onclick="testAPIConnection()">
+                            <i data-feather="wifi"></i> Test API Connection
+                        </button>
+                        <a href="{{ url_for('compose') }}" class="btn btn-outline-primary">
+                            <i data-feather="edit"></i> Try Email Generation
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function testAPIConnection() {
+    try {
+        const response = await fetch('/api/v1/status');
+        const data = await response.json();
+        
+        let message = 'API Connection Test:\n\n';
+        message += `Flask Service: ${data.flask_service.status}\n`;
+        message += `FastAPI Service: ${data.fastapi_service.status}\n`;
+        
+        if (data.fastapi_service.models) {
+            message += `\nAvailable Models:\n`;
+            Object.keys(data.fastapi_service.models).forEach(model => {
+                message += `- ${model}: ${data.fastapi_service.models[model]}\n`;
+            });
+        }
+        
+        alert(message);
+    } catch (error) {
+        alert('Error testing API connection: ' + error.message);
+    }
+}
+</script>
+{% endblock %}

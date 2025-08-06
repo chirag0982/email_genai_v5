@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - AI Email Assistant{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Email Analytics</h1>
+                <p class="text-muted mb-0">Track performance and insights across your email communications</p>
+            </div>
+            <div class="d-flex gap-2">
+                <!-- Date Range Filter -->
+                <select class="form-select" id="dateRange" style="width: auto;">
+                    <option value="7">Last 7 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="365">Last year</option>
+                </select>
+                
+                <!-- Team Filter -->
+                {% if teams %}
+                <select class="form-select" id="teamFilter" style="width: auto;">
+                    <option value="">All Teams</option>
+                    {% for team in teams %}
+                    <option value="{{ team.id }}">{{ team.name }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Overview Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                            <i data-feather="mail" class="text-primary"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold h4 mb-0" id="totalEmails">{{ user_analytics.total_emails or 0 }}</div>
+                        <div class="text-muted small">Total Emails</div>
+                        <div class="small text-success" id="emailsTrend">
+                            <i data-feather="trending-up"></i> +12% vs last period
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                            <i data-feather="check-circle" class="text-success"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold h4 mb-0" id="successRate">{{ (user_analytics.success_rate or 0)|round(1) }}%</div>
+                        <div class="text-muted small">Success Rate</div>
+                        <div class="small text-success" id="successTrend">
+                            <i data-feather="trending-up"></i> +5.2% vs last period
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                            <i data-feather="clock" class="text-warning"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold h4 mb-0" id="avgResponseTime">{{ ((user_analytics.avg_generation_time_ms or 0) / 1000)|round(1) }}s</div>
+                        <div class="text-muted small">Avg Response Time</div>
+                        <div class="small text-success" id="timeTrend">
+                            <i data-feather="trending-down"></i> -0.3s vs last period
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-info bg-opacity-10 rounded-circle p-3">
+                            <i data-feather="star" class="text-info"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold h4 mb-0" id="avgRating">{{ user_analytics.avg_user_rating or 'N/A' }}</div>
+                        <div class="text-muted small">Avg Rating</div>
+                        <div class="small text-success" id="ratingTrend">
+                            <i data-feather="trending-up"></i> +0.2 vs last period
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="row g-4 mb-4">
+    <!-- Email Volume Chart -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="mb-0">Email Volume Over Time</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="emailVolumeChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- AI Model Usage -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="mb-0">AI Model Usage</h6>
+            </div>
+            <div class="card-body">
+                {% if user_analytics.model_usage %}
+                <canvas id="modelUsageChart" height="160"></canvas>
+                {% else %}
+                <div class="text-center py-4">
+                    <i data-feather="cpu" class="text-muted mb-2"></i>
+                    <p class="text-muted mb-0">No AI model usage data yet</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Metrics -->
+<div class="row g-4 mb-4">
+    <!-- Response Time Distribution -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="mb-0">Response Time Distribution</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="responseTimeChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Email Status Breakdown -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h6 class="mb-0">Email Status Breakdown</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="statusChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Team Analytics (if available) -->
+{% if team_analytics %}
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Team Performance Comparison</h5>
+                    <span class="badge bg-info">Manager View</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Team</th>
+                                <th>Total Emails</th>
+                                <th>Success Rate</th>
+                                <th>Avg Response Time</th>
+                                <th>Avg Rating</th>
+                                <th>Top AI Model</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for team_data in team_analytics %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2">
+                                            <i data-feather="users" class="text-primary"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-medium">{{ team_data.team.name }}</div>
+                                            <small class="text-muted">{{ team_data.team.members|length }} members</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="fw-medium">{{ team_data.analytics.total_emails or 0 }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if (team_data.analytics.success_rate or 0) > 90 else 'warning' if (team_data.analytics.success_rate or 0) > 70 else 'danger' }}">
+                                        {{ (team_data.analytics.success_rate or 0)|round(1) }}%
+                                    </span>
+                                </td>
+                                <td>{{ ((team_data.analytics.avg_generation_time_ms or 0) / 1000)|round(1) }}s</td>
+                                <td>
+                                    {% if team_data.analytics.avg_user_rating %}
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-1">{{ team_data.analytics.avg_user_rating }}</span>
+                                        <i data-feather="star" class="text-warning" style="width: 14px;"></i>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if team_data.analytics.model_usage %}
+                                    <span class="badge bg-info">
+                                        {{ team_data.analytics.model_usage | dictsort(reverse=true, by='value') | first | first }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Insights Panel -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0">
+                    <i data-feather="lightbulb"></i>
+                    AI-Powered Insights
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="insight-card bg-light p-3 rounded">
+                            <div class="d-flex align-items-center mb-2">
+                                <i data-feather="trending-up" class="text-success me-2"></i>
+                                <h6 class="mb-0 text-success">Performance Trend</h6>
+                            </div>
+                            <p class="small mb-0">Your email response time has improved by 15% this month. Keep using AI assistance to maintain this efficiency.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="insight-card bg-light p-3 rounded">
+                            <div class="d-flex align-items-center mb-2">
+                                <i data-feather="cpu" class="text-primary me-2"></i>
+                                <h6 class="mb-0 text-primary">Model Recommendation</h6>
+                            </div>
+                            <p class="small mb-0">Based on your usage patterns, Qwen-4 Turbo provides the best balance of speed and quality for your email types.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="insight-card bg-light p-3 rounded">
+                            <div class="d-flex align-items-center mb-2">
+                                <i data-feather="target" class="text-warning me-2"></i>
+                                <h6 class="mb-0 text-warning">Optimization Tip</h6>
+                            </div>
+                            <p class="small mb-0">Consider creating templates for your most common email types to save even more time.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts
+    initializeCharts();
+    
+    // Filter handlers
+    document.getElementById('dateRange').addEventListener('change', function() {
+        refreshAnalytics();
+    });
+    
+    const teamFilter = document.getElementById('teamFilter');
+    if (teamFilter) {
+        teamFilter.addEventListener('change', function() {
+            refreshAnalytics();
+        });
+    }
+});
+
+function initializeCharts() {
+    // Email Volume Chart
+    const emailVolumeCtx = document.getElementById('emailVolumeChart').getContext('2d');
+    const emailVolumeChart = new Chart(emailVolumeCtx, {
+        type: 'line',
+        data: {
+            labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+            datasets: [{
+                label: 'Emails Sent',
+                data: [12, 19, 15, 25],
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'AI Generated',
+                data: [8, 15, 12, 20],
+                borderColor: '#20c997',
+                backgroundColor: 'rgba(32, 201, 151, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // AI Model Usage Chart
+    {% if user_analytics.model_usage %}
+    const modelUsageCtx = document.getElementById('modelUsageChart').getContext('2d');
+    const modelUsage = {{ user_analytics.model_usage | tojson }};
+    
+    const modelUsageChart = new Chart(modelUsageCtx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(modelUsage).map(key => key.replace('-', ' ').toUpperCase()),
+            datasets: [{
+                data: Object.values(modelUsage),
+                backgroundColor: [
+                    '#0d6efd',
+                    '#20c997',
+                    '#ffc107',
+                    '#dc3545',
+                    '#6f42c1'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+    {% endif %}
+    
+    // Response Time Distribution Chart
+    const responseTimeCtx = document.getElementById('responseTimeChart').getContext('2d');
+    const responseTimeChart = new Chart(responseTimeCtx, {
+        type: 'bar',
+        data: {
+            labels: ['<1s', '1-2s', '2-3s', '3-5s', '>5s'],
+            datasets: [{
+                label: 'Number of Emails',
+                data: [45, 35, 15, 8, 2],
+                backgroundColor: [
+                    '#20c997',
+                    '#0d6efd',
+                    '#ffc107',
+                    '#fd7e14',
+                    '#dc3545'
+                ],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // Email Status Chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Sent', 'Draft', 'Failed', 'Delivered'],
+            datasets: [{
+                data: [{{ user_analytics.sent_emails or 0 }}, {{ user_analytics.draft_emails or 0 }}, {{ user_analytics.failed_emails or 0 }}, {{ user_analytics.sent_emails or 0 }}],
+                backgroundColor: [
+                    '#20c997',
+                    '#6c757d',
+                    '#dc3545',
+                    '#0d6efd'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+async function refreshAnalytics() {
+    const dateRange = document.getElementById('dateRange').value;
+    const teamFilter = document.getElementById('teamFilter');
+    const teamId = teamFilter ? teamFilter.value : '';
+    
+    try {
+        const params = new URLSearchParams();
+        params.append('days', dateRange);
+        if (teamId) params.append('team_id', teamId);
+        
+        const response = await fetch(`/api/analytics?${params}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            updateAnalyticsDisplay(data.analytics);
+        } else {
+            showToast('Error loading analytics: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Network error while loading analytics', 'error');
+    }
+}
+
+function updateAnalyticsDisplay(analytics) {
+    // Update overview cards
+    document.getElementById('totalEmails').textContent = analytics.total_emails || 0;
+    document.getElementById('successRate').textContent = (analytics.success_rate || 0).toFixed(1) + '%';
+    document.getElementById('avgResponseTime').textContent = ((analytics.avg_generation_time_ms || 0) / 1000).toFixed(1) + 's';
+    document.getElementById('avgRating').textContent = analytics.avg_user_rating || 'N/A';
+    
+    // Here you would update the charts with new data
+    // For brevity, this is simplified - in a real app you'd update all chart data
+}
+
+// Export functionality
+function exportAnalytics(format = 'csv') {
+    const dateRange = document.getElementById('dateRange').value;
+    const teamFilter = document.getElementById('teamFilter');
+    const teamId = teamFilter ? teamFilter.value : '';
+    
+    const params = new URLSearchParams();
+    params.append('format', format);
+    params.append('days', dateRange);
+    if (teamId) params.append('team_id', teamId);
+    
+    window.open(`/api/export-analytics?${params}`, '_blank');
+}
+</script>
+{% endblock %}

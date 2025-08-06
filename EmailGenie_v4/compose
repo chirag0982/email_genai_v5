@@ -1,0 +1,393 @@
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+import logging
+import os
+from enum import Enum
+
+# --- Enums ---
+class AIModel(Enum):
+    GPT3_5_TURBO = "gpt-3.5-turbo"
+    GPT4 = "gpt-4"
+
+class EmailTone(Enum):
+    PROFESSIONAL = "professional"
+    CASUAL = "casual"
+    FRIENDLY = "friendly"
+    FORMAL = "formal"
+
+# --- Database Setup (using SQLAlchemy for demonstration) ---
+# In a real app, you'd use a proper ORM like SQLAlchemy with a database
+# For this example, we'll simulate a database with a list of dictionaries
+
+# Simulate User, Team, TeamMember, EmailTemplate, Email models
+class User(UserMixin):
+    def __init__(self, id, username, password_hash, email):
+        self.id = id
+        self.username = username
+        self.password_hash = password_hash
+        self.email = email
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+class Team:
+    def __init__(self, id, name):
+        self.id = id
+        self.name = name
+
+class TeamMember:
+    def __init__(self, user_id, team_id):
+        self.user_id = user_id
+        self.team_id = team_id
+
+class EmailTemplate:
+    def __init__(self, id, name, subject, body_html, body_text, user_id=None, team_id=None, is_public=False):
+        self.id = id
+        self.name = name
+        self.subject = subject
+        self.body_html = body_html
+        self.body_text = body_text
+        self.user_id = user_id
+        self.team_id = team_id
+        self.is_public = is_public
+
+class Email:
+    def __init__(self, id, user_id, subject, body_html, body_text, to_addresses, cc_addresses, bcc_addresses, created_at, status='draft', team_id=None):
+        self.id = id
+        self.user_id = user_id
+        self.subject = subject
+        self.body_html = body_html
+        self.body_text = body_text
+        self.to_addresses = to_addresses
+        self.cc_addresses = cc_addresses
+        self.bcc_addresses = bcc_addresses
+        self.created_at = created_at
+        self.status = status
+        self.team_id = team_id
+
+# Dummy database
+users_db = {
+    1: User(1, 'testuser', generate_password_hash('password'), 'testuser@example.com'),
+}
+teams_db = {
+    1: Team(1, 'Awesome Team'),
+}
+team_members_db = [
+    TeamMember(1, 1),
+]
+email_templates_db = [
+    EmailTemplate(1, 'Welcome Email', 'Welcome!', '<p>Welcome aboard!</p>', 'Welcome aboard!', user_id=1),
+    EmailTemplate(2, 'Team Announcement', 'Important Update', '<p>Hello team, important update inside.</p>', 'Hello team, important update inside.', team_id=1, is_public=True),
+]
+emails_db = [
+    Email(1, 1, 'Draft Subject', '<p>This is a draft email body.</p>', 'This is a draft email body.', ['recipient@example.com'], [], [], datetime.utcnow(), status='draft', team_id=1),
+    Email(2, 1, 'Sent Email', '<p>This is a sent email.</p>', 'This is a sent email.', ['recipient2@example.com'], [], [], datetime.utcnow(), status='sent'),
+]
+
+# Mocking database query methods for demonstration
+class MockQuery:
+    def __init__(self, data):
+        self._data = data
+        self._filters = {}
+
+    def filter_by(self, **kwargs):
+        self._filters.update(kwargs)
+        return self
+
+    def all(self):
+        results = []
+        for item in self._data:
+            match = True
+            for key, value in self._filters.items():
+                if not hasattr(item, key) or getattr(item, key) != value:
+                    match = False
+                    break
+            if match:
+                results.append(item)
+        return results
+
+    def get(self, item_id):
+        for item in self._data:
+            if hasattr(item, 'id') and item.id == item_id:
+                return item
+        return None
+
+    def first(self):
+        results = self.all()
+        return results[0] if results else None
+
+class MockDB:
+    def __init__(self):
+        self.User = MockQuery(list(users_db.values()))
+        self.Team = MockQuery(list(teams_db.values()))
+        self.TeamMember = MockQuery(team_members_db)
+        self.EmailTemplate = MockQuery(email_templates_db)
+        self.Email = MockQuery(emails_db)
+
+# Replace actual DB queries with mock queries for demonstration
+# In a real Flask app, you'd have your SQLAlchemy models and session
+TeamMember = MockDB().TeamMember
+Team = MockDB().Team
+User = MockDB().User
+EmailTemplate = MockDB().EmailTemplate
+Email = MockDB().Email
+
+# --- Flask App Setup ---
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a_very_secret_key') # Change this in production
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# --- Helper Functions ---
+def require_login(func):
+    """Decorator to ensure user is logged in."""
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('login'))
+        return func(*args, **kwargs)
+    return wrapper
+
+# --- Mock User Loader ---
+@login_manager.user_loader
+def load_user(user_id):
+    # In a real app, this would query your database for the user
+    return users_db.get(int(user_id))
+
+# --- Routes ---
+@app.route('/')
+def index():
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = users_db.get(1) # Mock user lookup
+
+        if user and user.username == username and user.check_password(password):
+            login_user(user)
+            flash('Login successful!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password', 'error')
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+@app.route('/dashboard')
+@require_login
+def dashboard():
+    """Dashboard page displaying sent and draft emails."""
+    user_emails = Email.query.filter_by(user_id=current_user.id).order_by(Email.created_at.desc()).all()
+    return render_template('dashboard.html', emails=user_emails)
+
+@app.route('/compose')
+@require_login
+def compose():
+    """Email composition page"""
+    try:
+        # Get user's teams and templates
+        team_memberships = TeamMember.query.filter_by(user_id=current_user.id).all()
+        teams = [membership.team for membership in team_memberships]
+
+        # Get templates (user's own + team templates)
+        user_templates = EmailTemplate.query.filter_by(user_id=current_user.id).all()
+        team_templates = []
+        for team in teams:
+            team_templates.extend(
+                EmailTemplate.query.filter_by(team_id=team.id, is_public=True).all()
+            )
+
+        all_templates = user_templates + team_templates
+
+        # Check if loading an existing draft
+        email_id = request.args.get('email_id')
+        draft_data = None
+        if email_id:
+            email = Email.query.get(email_id)
+            if email and email.user_id == current_user.id:
+                draft_data = {
+                    'id': email.id,
+                    'subject': email.subject or '',
+                    'body_html': email.body_html or '',
+                    'body_text': email.body_text or '',
+                    'to_addresses': email.to_addresses or [],
+                    'cc_addresses': email.cc_addresses or [],
+                    'bcc_addresses': email.bcc_addresses or [],
+                    'team_id': email.team_id
+                }
+
+        return render_template('compose.html',
+                             user=current_user,
+                             teams=teams,
+                             templates=all_templates,
+                             ai_models=list(AIModel),
+                             email_tones=list(EmailTone),
+                             draft_data=draft_data)
+    except Exception as e:
+        logging.error(f"Error loading compose page: {str(e)}")
+        flash('Error loading compose page', 'error')
+        return redirect(url_for('dashboard'))
+
+@app.route('/save_draft', methods=['POST'])
+@require_login
+def save_draft():
+    """Saves the current email composition as a draft."""
+    data = request.get_json()
+
+    email_id = data.get('id')
+    subject = data.get('subject')
+    body_html = data.get('body_html')
+    body_text = data.get('body_text')
+    to_addresses = data.get('to', [])
+    cc_addresses = data.get('cc', [])
+    bcc_addresses = data.get('bcc', [])
+    team_id = data.get('team_id')
+
+    try:
+        if email_id:
+            # Update existing draft
+            email = Email.query.get(email_id)
+            if not email or email.user_id != current_user.id:
+                return jsonify({'success': False, 'message': 'Email not found or unauthorized'}), 404
+            email.subject = subject
+            email.body_html = body_html
+            email.body_text = body_text
+            email.to_addresses = to_addresses
+            email.cc_addresses = cc_addresses
+            email.bcc_addresses = bcc_addresses
+            email.team_id = team_id
+            email.status = 'draft' # Ensure it remains a draft
+        else:
+            # Create new draft
+            new_email = Email(
+                id=len(emails_db) + 1, # Simple ID generation, use UUID in production
+                user_id=current_user.id,
+                subject=subject,
+                body_html=body_html,
+                body_text=body_text,
+                to_addresses=to_addresses,
+                cc_addresses=cc_addresses,
+                bcc_addresses=bcc_addresses,
+                created_at=datetime.utcnow(),
+                status='draft',
+                team_id=team_id
+            )
+            emails_db.append(new_email) # Add to mock DB
+            email_id = new_email.id
+
+        # In a real app, you'd commit changes to your database session here
+        # db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Draft saved successfully!', 'email_id': email_id})
+    except Exception as e:
+        logging.error(f"Error saving draft: {str(e)}")
+        # db.session.rollback() # Rollback in case of error
+        return jsonify({'success': False, 'message': 'Error saving draft.'}), 500
+
+@app.route('/send_email', methods=['POST'])
+@require_login
+def send_email():
+    """Sends the email."""
+    data = request.get_json()
+
+    email_id = data.get('id')
+    subject = data.get('subject')
+    body_html = data.get('body_html')
+    body_text = data.get('body_text')
+    to_addresses = data.get('to', [])
+    cc_addresses = data.get('cc', [])
+    bcc_addresses = data.get('bcc', [])
+    team_id = data.get('team_id')
+
+    try:
+        if email_id:
+            email = Email.query.get(email_id)
+            if not email or email.user_id != current_user.id:
+                return jsonify({'success': False, 'message': 'Email not found or unauthorized'}), 404
+            # Update existing email details before sending
+            email.subject = subject
+            email.body_html = body_html
+            email.body_text = body_text
+            email.to_addresses = to_addresses
+            email.cc_addresses = cc_addresses
+            email.bcc_addresses = bcc_addresses
+            email.team_id = team_id
+            email.status = 'sent'
+        else:
+            # Create and send a new email
+            new_email = Email(
+                id=len(emails_db) + 1, # Simple ID generation
+                user_id=current_user.id,
+                subject=subject,
+                body_html=body_html,
+                body_text=body_text,
+                to_addresses=to_addresses,
+                cc_addresses=cc_addresses,
+                bcc_addresses=bcc_addresses,
+                created_at=datetime.utcnow(),
+                status='sent',
+                team_id=team_id
+            )
+            emails_db.append(new_email) # Add to mock DB
+            email_id = new_email.id
+
+        # --- Simulate sending email ---
+        logging.info(f"Simulating sending email to: {', '.join(to_addresses)}")
+        logging.info(f"Subject: {subject}")
+        # In a real app, you'd use smtplib or a transactional email service here
+        # send_actual_email(to_addresses, subject, body_html, body_text)
+
+        # db.session.commit()
+        return jsonify({'success': True, 'message': 'Email sent successfully!', 'email_id': email_id})
+
+    except Exception as e:
+        logging.error(f"Error sending email: {str(e)}")
+        # db.session.rollback()
+        return jsonify({'success': False, 'message': 'Error sending email.'}), 500
+
+
+# --- Run the App ---
+if __name__ == '__main__':
+    # Configure basic logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # Create dummy data if databases are empty (for demonstration)
+    if not users_db:
+        users_db[1] = User(1, 'testuser', generate_password_hash('password'), 'testuser@example.com')
+    if not teams_db:
+        teams_db[1] = Team(1, 'Awesome Team')
+        team_members_db.append(TeamMember(1, 1))
+    if not email_templates_db:
+        email_templates_db.extend([
+            EmailTemplate(1, 'Welcome Email', 'Welcome!', '<p>Welcome aboard!</p>', 'Welcome aboard!', user_id=1),
+            EmailTemplate(2, 'Team Announcement', 'Important Update', '<p>Hello team, important update inside.</p>', 'Hello team, important update inside.', team_id=1, is_public=True),
+        ])
+    if not emails_db:
+        emails_db.extend([
+            Email(1, 1, 'Draft Subject', '<p>This is a draft email body.</p>', 'This is a draft email body.', ['recipient@example.com'], [], [], datetime.utcnow(), status='draft', team_id=1),
+            Email(2, 1, 'Sent Email', '<p>This is a sent email.</p>', 'This is a sent email.', ['recipient2@example.com'], [], [], datetime.utcnow(), status='sent'),
+        ])
+
+    # In a real app, you would use:
+    # from flask_sqlalchemy import SQLAlchemy
+    # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db' # Example for SQLite
+    # db = SQLAlchemy(app)
+    # then define your models inheriting from db.Model and use db.session
+
+    app.run(debug=True)
