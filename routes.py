@@ -2,7 +2,7 @@ from flask import render_template, request, jsonify, redirect, url_for, flash, s
 from flask_login import current_user
 from app import app, db
 from local_auth import require_login, local_auth
-from models import (User, Team, TeamMember, Email, EmailTemplate, EmailAnalytics,
+from models import (User, Team, TeamMember, TeamInvitation, Email, EmailTemplate, EmailAnalytics,
                    EmailStatus, UserRole, AIModel, EmailTone)
 from ai_service import ai_service
 from email_service import email_service
@@ -40,6 +40,12 @@ def dashboard():
         team_memberships = TeamMember.query.filter_by(user_id=current_user.id).all()
         teams = [membership.team for membership in team_memberships]
 
+        # Get pending invitations
+        pending_invitations = TeamInvitation.query.filter_by(
+            invited_user_id=current_user.id,
+            status='pending'
+        ).all()
+
         # Get recent emails
         recent_emails = Email.query.filter_by(user_id=current_user.id)\
                                  .order_by(Email.created_at.desc())\
@@ -55,6 +61,7 @@ def dashboard():
         return render_template('dashboard.html',
                              user=current_user,
                              teams=teams,
+                             pending_invitations=pending_invitations,
                              recent_emails=recent_emails,
                              analytics=analytics.get('analytics', {}))
     except Exception as e:
@@ -430,10 +437,19 @@ def team():
         teams = []
 
         for membership in team_memberships:
+            # Get pending invitations for teams where user can manage
+            pending_invitations = []
+            if membership.role in [UserRole.ADMIN, UserRole.MANAGER]:
+                pending_invitations = TeamInvitation.query.filter_by(
+                    team_id=membership.team_id,
+                    status='pending'
+                ).all()
+            
             team_data = {
                 'team': membership.team,
                 'role': membership.role,
-                'members': membership.team.members
+                'members': membership.team.members,
+                'pending_invitations': pending_invitations
             }
             teams.append(team_data)
 
@@ -491,13 +507,14 @@ def create_team():
 @app.route('/api/invite-member', methods=['POST'])
 @require_login
 def invite_member():
-    """Invite a new team member"""
+    """Send invitation to a team member"""
     try:
         data = request.get_json()
         
         team_id = data.get('team_id')
         email = data.get('email', '').strip()
         role = data.get('role', 'user')
+        message = data.get('message', '')
         
         if not all([team_id, email]):
             return jsonify({'success': False, 'error': 'Team ID and email are required'}), 400
@@ -530,23 +547,35 @@ def invite_member():
         if existing_membership:
             return jsonify({'success': False, 'error': 'User is already a member of this team'}), 400
         
-        # Create membership
-        membership = TeamMember(
-            id=str(uuid.uuid4()),
-            user_id=invited_user.id,
+        # Check if invitation already exists
+        existing_invitation = TeamInvitation.query.filter_by(
             team_id=team_id,
-            role=UserRole(role)
+            invited_user_id=invited_user.id,
+            status='pending'
+        ).first()
+        
+        if existing_invitation:
+            return jsonify({'success': False, 'error': 'Invitation already sent to this user'}), 400
+        
+        # Create invitation
+        invitation = TeamInvitation(
+            id=str(uuid.uuid4()),
+            team_id=team_id,
+            invited_user_id=invited_user.id,
+            invited_by_id=current_user.id,
+            role=UserRole(role),
+            message=message
         )
-        db.session.add(membership)
+        db.session.add(invitation)
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': f'{invited_user.first_name or email} has been added to the team'
+            'message': f'Invitation sent to {invited_user.first_name or email}'
         })
         
     except Exception as e:
-        logging.error(f"Error inviting member: {str(e)}")
+        logging.error(f"Error sending invitation: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/change-member-role', methods=['POST'])
@@ -645,6 +674,155 @@ def remove_member():
         
     except Exception as e:
         logging.error(f"Error removing member: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/get-invitations')
+@require_login
+def get_invitations():
+    """Get pending invitations for current user"""
+    try:
+        # Get pending invitations
+        invitations = TeamInvitation.query.filter_by(
+            invited_user_id=current_user.id,
+            status='pending'
+        ).all()
+        
+        invitation_data = []
+        for invitation in invitations:
+            invitation_data.append({
+                'id': invitation.id,
+                'team': {
+                    'id': invitation.team.id,
+                    'name': invitation.team.name,
+                    'description': invitation.team.description
+                },
+                'invited_by': {
+                    'name': invitation.invited_by.first_name or invitation.invited_by.email.split('@')[0],
+                    'email': invitation.invited_by.email
+                },
+                'role': invitation.role.value,
+                'message': invitation.message,
+                'created_at': invitation.created_at.isoformat()
+            })
+        
+        return jsonify({
+            'success': True,
+            'invitations': invitation_data
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting invitations: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/respond-invitation', methods=['POST'])
+@require_login
+def respond_invitation():
+    """Accept or decline team invitation"""
+    try:
+        data = request.get_json()
+        
+        invitation_id = data.get('invitation_id')
+        response = data.get('response')  # 'accept' or 'decline'
+        
+        if not all([invitation_id, response]):
+            return jsonify({'success': False, 'error': 'Invitation ID and response are required'}), 400
+        
+        if response not in ['accept', 'decline']:
+            return jsonify({'success': False, 'error': 'Response must be "accept" or "decline"'}), 400
+        
+        # Get the invitation
+        invitation = TeamInvitation.query.get(invitation_id)
+        if not invitation:
+            return jsonify({'success': False, 'error': 'Invitation not found'}), 404
+        
+        # Check if invitation belongs to current user
+        if invitation.invited_user_id != current_user.id:
+            return jsonify({'success': False, 'error': 'This invitation does not belong to you'}), 403
+        
+        # Check if invitation is still pending
+        if invitation.status != 'pending':
+            return jsonify({'success': False, 'error': 'This invitation has already been responded to'}), 400
+        
+        # Update invitation status
+        invitation.status = 'accepted' if response == 'accept' else 'declined'
+        invitation.responded_at = datetime.now()
+        
+        message = ''
+        
+        if response == 'accept':
+            # Check if user is already a member (race condition protection)
+            existing_membership = TeamMember.query.filter_by(
+                user_id=current_user.id,
+                team_id=invitation.team_id
+            ).first()
+            
+            if not existing_membership:
+                # Create team membership
+                membership = TeamMember(
+                    id=str(uuid.uuid4()),
+                    user_id=current_user.id,
+                    team_id=invitation.team_id,
+                    role=invitation.role
+                )
+                db.session.add(membership)
+                message = f'Successfully joined {invitation.team.name}'
+            else:
+                message = f'You are already a member of {invitation.team.name}'
+        else:
+            message = f'Declined invitation to {invitation.team.name}'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': message
+        })
+        
+    except Exception as e:
+        logging.error(f"Error responding to invitation: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/cancel-invitation', methods=['DELETE'])
+@require_login
+def cancel_invitation():
+    """Cancel a pending invitation"""
+    try:
+        data = request.get_json()
+        invitation_id = data.get('invitation_id')
+        
+        if not invitation_id:
+            return jsonify({'success': False, 'error': 'Invitation ID is required'}), 400
+        
+        # Get the invitation
+        invitation = TeamInvitation.query.get(invitation_id)
+        if not invitation:
+            return jsonify({'success': False, 'error': 'Invitation not found'}), 404
+        
+        # Check if current user has permission (must be admin/manager of the team or the person who sent the invitation)
+        user_membership = TeamMember.query.filter_by(
+            user_id=current_user.id,
+            team_id=invitation.team_id
+        ).first()
+        
+        if not (invitation.invited_by_id == current_user.id or 
+                (user_membership and user_membership.role in [UserRole.ADMIN, UserRole.MANAGER])):
+            return jsonify({'success': False, 'error': 'You do not have permission to cancel this invitation'}), 403
+        
+        # Check if invitation is still pending
+        if invitation.status != 'pending':
+            return jsonify({'success': False, 'error': 'Can only cancel pending invitations'}), 400
+        
+        # Delete the invitation
+        db.session.delete(invitation)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Invitation cancelled successfully'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error cancelling invitation: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

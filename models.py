@@ -95,6 +95,29 @@ class Team(db.Model):
     emails = db.relationship('Email', back_populates='team', cascade='all, delete-orphan')
     templates = db.relationship('EmailTemplate', back_populates='team', cascade='all, delete-orphan')
 
+# Team invitations model
+class TeamInvitation(db.Model):
+    __tablename__ = 'team_invitations'
+    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id = db.Column(db.String, db.ForeignKey('teams.id'), nullable=False)
+    invited_user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
+    invited_by_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
+    role = db.Column(db.Enum(UserRole), default=UserRole.USER)
+    
+    # Invitation status
+    status = db.Column(db.String, default='pending')  # pending, accepted, declined
+    message = db.Column(db.Text)  # Optional invitation message
+    
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    responded_at = db.Column(db.DateTime)
+    
+    # Relationships
+    team = db.relationship('Team', foreign_keys=[team_id])
+    invited_user = db.relationship('User', foreign_keys=[invited_user_id])
+    invited_by = db.relationship('User', foreign_keys=[invited_by_id])
+    
+    __table_args__ = (UniqueConstraint('team_id', 'invited_user_id', name='uq_team_invitation'),)
+
 # Team membership model
 class TeamMember(db.Model):
     __tablename__ = 'team_members'

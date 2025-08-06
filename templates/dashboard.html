@@ -95,6 +95,21 @@
 </div>
 
 <div class="row">
+    <!-- Pending Invitations -->
+    {% if pending_invitations %}
+    <div class="col-12 mb-4">
+        <div class="alert alert-info d-flex align-items-center" role="alert">
+            <i data-feather="mail" class="me-2"></i>
+            <div class="flex-grow-1">
+                <strong>You have {{ pending_invitations|length }} pending team invitation{{ 's' if pending_invitations|length != 1 else '' }}</strong>
+                <button class="btn btn-sm btn-outline-info ms-2" data-bs-toggle="modal" data-bs-target="#invitationsModal">
+                    View Invitations
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Recent Emails -->
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
@@ -300,46 +315,90 @@
         </div>
     </div>
 </div>
+
+<!-- Invitations Modal -->
+{% if pending_invitations %}
+<div class="modal fade" id="invitationsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Team Invitations</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% for invitation in pending_invitations %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="card-title">{{ invitation.team.name }}</h6>
+                                <p class="card-text text-muted">{{ invitation.team.description or 'No description provided' }}</p>
+                                <small class="text-muted">
+                                    Invited by: {{ invitation.invited_by.first_name or invitation.invited_by.email.split('@')[0] }}
+                                    <br>
+                                    Role: <span class="badge bg-secondary">{{ invitation.role.value.title() }}</span>
+                                    <br>
+                                    {{ invitation.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                                </small>
+                                {% if invitation.message %}
+                                <div class="mt-2">
+                                    <small><strong>Message:</strong> {{ invitation.message }}</small>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="btn-group-vertical" role="group">
+                                <button type="button" class="btn btn-sm btn-success" 
+                                        onclick="respondToInvitation('{{ invitation.id }}', 'accept')">
+                                    <i data-feather="check"></i> Accept
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                        onclick="respondToInvitation('{{ invitation.id }}', 'decline')">
+                                    <i data-feather="x"></i> Decline
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
-{% block extra_scripts %}
-{% if analytics.model_usage %}
+{% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Model Usage Chart
-    const ctx = document.getElementById('modelUsageChart').getContext('2d');
-    const modelUsage = {{ analytics.model_usage | tojson }};
+async function respondToInvitation(invitationId, response) {
+    try {
+        const res = await fetch('/api/respond-invitation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                invitation_id: invitationId,
+                response: response
+            })
+        });
 
-    new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(modelUsage),
-            datasets: [{
-                data: Object.values(modelUsage),
-                backgroundColor: [
-                    '#0d6efd',
-                    '#20c997',
-                    '#ffc107',
-                    '#dc3545',
-                    '#6f42c1'
-                ],
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'right'
-                }
-            }
+        const result = await res.json();
+
+        if (result.success) {
+            showToast(result.message, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast('Error: ' + result.error, 'error');
         }
-    });
-});
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Network error', 'error');
+    }
+}
 </script>
-{% endif %}
 
 <script>
 // Function to view email details
