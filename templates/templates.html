@@ -464,8 +464,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData(templateForm);
             const data = Object.fromEntries(formData.entries());
 
-            // Convert checkbox
-            data.is_public = document.getElementById('templatePublic').checked;
+            // Convert checkbox and validate
+            data.is_public = document.getElementById('templatePublic')?.checked || false;
+            
+            // Ensure template_id is included for updates
+            const templateIdField = document.getElementById('templateId');
+            if (templateIdField && templateIdField.value) {
+                data.template_id = templateIdField.value;
+            }
+
+            console.log('Saving template data:', data);
 
             const response = await fetch('/api/save-template', {
                 method: 'POST',
@@ -486,10 +494,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.location.reload();
                 }, 1500);
             } else {
+                console.error('Save template error:', result);
                 showToast('Error saving template: ' + result.error, 'error');
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error saving template:', error);
             showToast('Network error while saving template', 'error');
         }
     });
@@ -499,24 +508,33 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
 
-            // Populate form with existing data
-            document.getElementById('templateId').value = this.dataset.templateId;
-            document.getElementById('templateName').value = this.dataset.name;
-            document.getElementById('templateDescription').value = this.dataset.description;
-            document.getElementById('templateSubject').value = this.dataset.subject;
-            document.getElementById('templateBody').value = this.dataset.body;
-            document.getElementById('defaultTone').value = this.dataset.tone;
-            document.getElementById('templatePublic').checked = this.dataset.isPublic === 'True';
+            try {
+                // Populate form with existing data
+                document.getElementById('templateId').value = this.dataset.templateId || '';
+                document.getElementById('templateName').value = this.dataset.name || '';
+                document.getElementById('templateDescription').value = this.dataset.description || '';
+                document.getElementById('templateSubject').value = this.dataset.subject || '';
+                document.getElementById('templateBody').value = this.dataset.body || '';
+                document.getElementById('defaultTone').value = this.dataset.tone || '';
+                const publicCheckbox = document.getElementById('templatePublic');
+                if (publicCheckbox) {
+                    publicCheckbox.checked = this.dataset.isPublic === 'True';
+                }
 
-            if (document.getElementById('templateTeam')) {
-                document.getElementById('templateTeam').value = this.dataset.teamId;
+                const teamSelect = document.getElementById('templateTeam');
+                if (teamSelect) {
+                    teamSelect.value = this.dataset.teamId || '';
+                }
+
+                // Update modal title
+                document.getElementById('modalTitle').textContent = 'Edit Template';
+
+                // Show modal
+                new bootstrap.Modal(templateModal).show();
+            } catch (error) {
+                console.error('Error editing template:', error);
+                showToast('Error opening template for editing', 'error');
             }
-
-            // Update modal title
-            document.getElementById('modalTitle').textContent = 'Edit Template';
-
-            // Show modal
-            new bootstrap.Modal(templateModal).show();
         });
     });
 
@@ -524,8 +542,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.delete-template-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
-            currentTemplateId = this.dataset.templateId;
-            new bootstrap.Modal(deleteModal).show();
+            try {
+                currentTemplateId = this.dataset.templateId;
+                if (!currentTemplateId) {
+                    showToast('Template ID not found', 'error');
+                    return;
+                }
+                new bootstrap.Modal(deleteModal).show();
+            } catch (error) {
+                console.error('Error opening delete confirmation:', error);
+                showToast('Error opening delete confirmation', 'error');
+            }
         });
     });
 
